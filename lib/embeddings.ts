@@ -407,11 +407,9 @@ export async function embedDocument(
 ): Promise<{ success: boolean; chunkCount: number; error?: string }> {
   try {
     const embeddingConfig = config || await getEmbeddingConfig(supabase);
-    
-    await supabase
-      .from("documents")
-      .update({ embedding_status: "processing" })
-      .eq("id", documentId);
+
+    // Note: Status is set to "processing" by the caller (API route) before calling this function
+    // to avoid race conditions. We only update to "completed" or "failed" here.
 
     const splitter = new RecursiveCharacterSplitter({
       chunkSize: embeddingConfig.chunkSize,
@@ -487,11 +485,17 @@ export async function embedDocument(
 
     if (upsertError) throw upsertError;
 
-    await supabase
+    // Delete any excess chunks from previous embeddings
+    const { error: deleteError } = await supabase
       .from("document_chunks")
       .delete()
       .eq("document_id", documentId)
       .gte("chunk_index", chunkDataList.length);
+
+    if (deleteError) {
+      console.warn("Failed to delete excess chunks:", deleteError);
+      // Continue execution - this is not critical
+    }
 
     await supabase
       .from("documents")

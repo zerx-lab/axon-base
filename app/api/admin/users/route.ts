@@ -5,6 +5,37 @@ import { Permissions } from "@/lib/supabase/permissions";
 import type { User } from "@/lib/supabase/types";
 import bcrypt from "bcryptjs";
 
+/**
+ * Escape special characters for Supabase ilike queries
+ * Prevents SQL injection by escaping %, _, and \
+ */
+function escapeSearchPattern(input: string): string {
+  return input
+    .replace(/\\/g, "\\\\")  // Escape backslash first
+    .replace(/%/g, "\\%")    // Escape percent
+    .replace(/_/g, "\\_");   // Escape underscore
+}
+
+/**
+ * Validate password strength
+ * Requirements: minimum 8 characters, at least one uppercase, one lowercase, one digit
+ */
+function validatePassword(password: string): { valid: boolean; error?: string } {
+  if (password.length < 8) {
+    return { valid: false, error: "Password must be at least 8 characters long" };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, error: "Password must contain at least one lowercase letter" };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, error: "Password must contain at least one uppercase letter" };
+  }
+  if (!/\d/.test(password)) {
+    return { valid: false, error: "Password must contain at least one digit" };
+  }
+  return { valid: true };
+}
+
 // GET /api/admin/users - List users
 export async function GET(request: NextRequest) {
   try {
@@ -41,9 +72,10 @@ export async function GET(request: NextRequest) {
       .from("users")
       .select("*, roles!inner(id, name, is_super_admin)", { count: "exact" });
 
-    // Apply search filter
+    // Apply search filter with escaped pattern to prevent SQL injection
     if (search) {
-      query = query.or(`username.ilike.%${search}%,display_name.ilike.%${search}%`);
+      const escapedSearch = escapeSearchPattern(search);
+      query = query.or(`username.ilike.%${escapedSearch}%,display_name.ilike.%${escapedSearch}%`);
     }
 
     // Apply pagination
@@ -92,6 +124,15 @@ export async function POST(request: NextRequest) {
     if (!operatorId || !username || !password || !roleId) {
       return NextResponse.json(
         { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    // Validate password strength
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      return NextResponse.json(
+        { error: passwordValidation.error },
         { status: 400 }
       );
     }

@@ -72,19 +72,20 @@ async function checkDocumentEmbeddingStatus(
 async function checkKnowledgeBaseEmbeddingStatus(
   kbId: string,
   operatorId: string
-): Promise<{ hasProcessing: boolean; allCompleted: boolean }> {
+): Promise<{ hasPendingOrProcessing: boolean; allCompleted: boolean }> {
   try {
     const params = new URLSearchParams({ operatorId, kbId });
     const response = await fetch(`/api/embeddings?${params}`);
-    if (!response.ok) return { hasProcessing: false, allCompleted: false };
+    if (!response.ok) return { hasPendingOrProcessing: false, allCompleted: false };
     const result = await response.json();
     const stats = result.stats;
-    if (!stats) return { hasProcessing: false, allCompleted: false };
-    const hasProcessing = stats.pending_documents > 0;
+    if (!stats) return { hasPendingOrProcessing: false, allCompleted: false };
+    // pending_documents includes both 'pending' and 'processing' status documents
+    const hasPendingOrProcessing = stats.pending_documents > 0;
     const allCompleted = stats.embedded_documents === stats.total_documents && stats.total_documents > 0;
-    return { hasProcessing, allCompleted };
+    return { hasPendingOrProcessing, allCompleted };
   } catch {
-    return { hasProcessing: false, allCompleted: false };
+    return { hasPendingOrProcessing: false, allCompleted: false };
   }
 }
 
@@ -176,7 +177,7 @@ export function TaskProvider({ children }: TaskProviderProps) {
                 progress: 100,
                 completedAt: Date.now(),
               });
-            } else if (status.hasProcessing) {
+            } else if (status.hasPendingOrProcessing) {
               restoredTasks.push({ ...task, status: "pending" as TaskStatus });
             } else {
               restoredTasks.push({
@@ -491,12 +492,13 @@ async function executeEmbedKnowledgeBase(
       }
 
       const status = await checkKnowledgeBaseEmbeddingStatus(kbId, operatorId);
-      
+
       if (status.allCompleted) {
         return { success: true };
       }
-      
-      if (!status.hasProcessing && !status.allCompleted) {
+
+      // No more pending/processing documents means task is complete (even if not all succeeded)
+      if (!status.hasPendingOrProcessing && !status.allCompleted) {
         return { success: true };
       }
     }

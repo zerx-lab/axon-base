@@ -25,8 +25,15 @@ export async function POST(request: NextRequest) {
 
     // Check if session is expired
     if (new Date(session.expires_at) < new Date()) {
-      // Delete expired session
-      await supabase.from("sessions").delete().eq("id", session.id);
+      // Delete expired session (log error but don't fail validation)
+      const { error: deleteError } = await supabase
+        .from("sessions")
+        .delete()
+        .eq("id", session.id);
+
+      if (deleteError) {
+        console.warn("Failed to delete expired session:", deleteError);
+      }
       return NextResponse.json({ valid: false });
     }
 

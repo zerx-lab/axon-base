@@ -4,6 +4,26 @@ import { hasPermission, canManageUser } from "@/lib/supabase/access";
 import { Permissions } from "@/lib/supabase/permissions";
 import bcrypt from "bcryptjs";
 
+/**
+ * Validate password strength
+ * Requirements: minimum 8 characters, at least one uppercase, one lowercase, one digit
+ */
+function validatePassword(password: string): { valid: boolean; error?: string } {
+  if (password.length < 8) {
+    return { valid: false, error: "Password must be at least 8 characters long" };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, error: "Password must contain at least one lowercase letter" };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, error: "Password must contain at least one uppercase letter" };
+  }
+  if (!/\d/.test(password)) {
+    return { valid: false, error: "Password must contain at least one digit" };
+  }
+  return { valid: true };
+}
+
 // POST /api/admin/users/reset-password - Reset user password
 export async function POST(request: NextRequest) {
   try {
@@ -13,6 +33,15 @@ export async function POST(request: NextRequest) {
     if (!operatorId || !userId || !newPassword) {
       return NextResponse.json(
         { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    // Validate password strength
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return NextResponse.json(
+        { error: passwordValidation.error },
         { status: 400 }
       );
     }

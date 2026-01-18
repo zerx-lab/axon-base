@@ -81,47 +81,47 @@ export const permissionsMeta: Record<
     category: "system",
   },
   [Permissions.KB_LIST]: {
-    i18nKey: "permission.kb.list",
+    i18nKey: "permissions.kb.list",
     category: "kb",
   },
   [Permissions.KB_CREATE]: {
-    i18nKey: "permission.kb.create",
+    i18nKey: "permissions.kb.create",
     category: "kb",
   },
   [Permissions.KB_UPDATE]: {
-    i18nKey: "permission.kb.update",
+    i18nKey: "permissions.kb.update",
     category: "kb",
   },
   [Permissions.KB_DELETE]: {
-    i18nKey: "permission.kb.delete",
+    i18nKey: "permissions.kb.delete",
     category: "kb",
   },
   [Permissions.DOCS_LIST]: {
-    i18nKey: "permission.docs.list",
+    i18nKey: "permissions.docs.list",
     category: "docs",
   },
   [Permissions.DOCS_CREATE]: {
-    i18nKey: "permission.docs.create",
+    i18nKey: "permissions.docs.create",
     category: "docs",
   },
   [Permissions.DOCS_UPDATE]: {
-    i18nKey: "permission.docs.update",
+    i18nKey: "permissions.docs.update",
     category: "docs",
   },
   [Permissions.DOCS_DELETE]: {
-    i18nKey: "permission.docs.delete",
+    i18nKey: "permissions.docs.delete",
     category: "docs",
   },
   [Permissions.EMBEDDING_VIEW]: {
-    i18nKey: "permission.embedding.view",
+    i18nKey: "permissions.embedding.view",
     category: "embedding",
   },
   [Permissions.EMBEDDING_MANAGE]: {
-    i18nKey: "permission.embedding.manage",
+    i18nKey: "permissions.embedding.manage",
     category: "embedding",
   },
   [Permissions.EMBEDDING_SEARCH]: {
-    i18nKey: "permission.embedding.search",
+    i18nKey: "permissions.embedding.search",
     category: "embedding",
   },
 };

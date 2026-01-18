@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
-import { hasPermission } from "@/lib/supabase/access";
+import { hasPermission, isSuperAdmin } from "@/lib/supabase/access";
 import { Permissions } from "@/lib/supabase/permissions";
 import type { 
   KnowledgeBaseSettings, 
@@ -64,6 +64,14 @@ export async function POST(request: NextRequest) {
 
     if (kbError || !kb) {
       return NextResponse.json({ error: "Knowledge base not found" }, { status: 404 });
+    }
+
+    // Verify ownership: only owner or super admin can search the knowledge base
+    if (kb.user_id !== operatorId) {
+      const operatorIsSuperAdmin = await isSuperAdmin(supabase, operatorId);
+      if (!operatorIsSuperAdmin) {
+        return NextResponse.json({ error: "Access denied to this knowledge base" }, { status: 403 });
+      }
     }
 
     const settings = getEmbeddingSettings(kb.settings as KnowledgeBaseSettings | null);

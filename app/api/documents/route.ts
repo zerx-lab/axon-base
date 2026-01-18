@@ -2,16 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/lib/supabase/access";
 import { Permissions } from "@/lib/supabase/permissions";
-
-function computeHash(content: string): string {
-  let hash = 0;
-  for (let i = 0; i < content.length; i++) {
-    const char = content.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash).toString(16).padStart(8, '0');
-}
+import { computeContentHash } from "@/lib/chunking";
 
 function countWords(content: string): number {
   const chineseChars = (content.match(/[\u4e00-\u9fa5]/g) || []).length;
@@ -120,7 +111,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Knowledge base not found" }, { status: 404 });
     }
 
-    const contentHash = computeHash(content);
+    const contentHash = computeContentHash(content);
     const wordCount = countWords(content);
     const charCount = content.length;
 
@@ -141,13 +132,8 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
-    await supabase
-      .from("knowledge_bases")
-      .update({ 
-        document_count: kb.document_count + 1, 
-        updated_at: new Date().toISOString() 
-      })
-      .eq("id", kbId);
+    // Use atomic increment to prevent race conditions
+    await supabase.rpc("increment_document_count", { kb_id_param: kbId });
 
     return NextResponse.json({ success: true, document: newDoc }, { status: 201 });
   } catch (error) {
@@ -187,7 +173,7 @@ export async function PATCH(request: NextRequest) {
 
     if (content !== undefined) {
       updateData.content = content;
-      updateData.content_hash = computeHash(content);
+      updateData.content_hash = computeContentHash(content);
       updateData.word_count = countWords(content);
       updateData.char_count = content.length;
     }
@@ -238,21 +224,8 @@ export async function DELETE(request: NextRequest) {
 
     if (error) throw error;
 
-    const { data: kb } = await supabase
-      .from("knowledge_bases")
-      .select("document_count")
-      .eq("id", existingDoc.kb_id)
-      .single();
-
-    if (kb) {
-      await supabase
-        .from("knowledge_bases")
-        .update({ 
-          document_count: Math.max(0, kb.document_count - 1), 
-          updated_at: new Date().toISOString() 
-        })
-        .eq("id", existingDoc.kb_id);
-    }
+    // Use atomic decrement to prevent race conditions
+    await supabase.rpc("decrement_document_count", { kb_id_param: existingDoc.kb_id });
 
     return NextResponse.json({ success: true });
   } catch (error) {

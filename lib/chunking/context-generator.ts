@@ -43,14 +43,53 @@ function truncateDocument(document: string, maxTokens: number): string {
   return document.substring(0, targetLength) + "\n\n[Document truncated for context generation...]";
 }
 
+// Maximum number of cached entries to prevent memory issues
+const MAX_CACHE_SIZE = 1000;
+
+interface CacheEntry {
+  value: string;
+  timestamp: number;
+}
+
 export class ContextGenerator {
-  private cache: Map<string, string> = new Map();
+  private cache: Map<string, CacheEntry> = new Map();
   private readonly chatConfig: ChatConfig;
   private readonly maxDocumentTokens: number;
+  private readonly maxCacheSize: number;
+  private readonly cacheTTL: number; // Cache TTL in milliseconds
 
-  constructor(chatConfig: ChatConfig, maxDocumentTokens: number = 8000) {
+  constructor(
+    chatConfig: ChatConfig,
+    maxDocumentTokens: number = 8000,
+    maxCacheSize: number = MAX_CACHE_SIZE,
+    cacheTTLMinutes: number = 30 // Default 30 minutes cache TTL
+  ) {
     this.chatConfig = chatConfig;
     this.maxDocumentTokens = maxDocumentTokens;
+    this.maxCacheSize = maxCacheSize;
+    this.cacheTTL = cacheTTLMinutes * 60 * 1000;
+  }
+
+  private evictOldEntries(): void {
+    const now = Date.now();
+
+    // Remove expired entries
+    for (const [key, entry] of this.cache.entries()) {
+      if (now - entry.timestamp > this.cacheTTL) {
+        this.cache.delete(key);
+      }
+    }
+
+    // If still over limit, remove oldest entries
+    if (this.cache.size > this.maxCacheSize) {
+      const entries = Array.from(this.cache.entries())
+        .sort((a, b) => a[1].timestamp - b[1].timestamp);
+
+      const toRemove = entries.slice(0, this.cache.size - this.maxCacheSize);
+      for (const [key] of toRemove) {
+        this.cache.delete(key);
+      }
+    }
   }
 
   private computeCacheKey(document: string, chunk: string): string {
@@ -69,9 +108,11 @@ export class ContextGenerator {
     title?: string
   ): Promise<string> {
     const cacheKey = this.computeCacheKey(document, chunk);
-    const cached = this.cache.get(cacheKey);
-    if (cached) {
-      return cached;
+    const cachedEntry = this.cache.get(cacheKey);
+
+    // Check if cached and not expired
+    if (cachedEntry && (Date.now() - cachedEntry.timestamp) < this.cacheTTL) {
+      return cachedEntry.value;
     }
 
     const truncatedDoc = truncateDocument(document, this.maxDocumentTokens);
@@ -85,7 +126,10 @@ export class ContextGenerator {
       context = await this.callOpenAICompatible(prompt);
     }
 
-    this.cache.set(cacheKey, context);
+    // Evict old entries if needed before adding new one
+    this.evictOldEntries();
+
+    this.cache.set(cacheKey, { value: context, timestamp: Date.now() });
     return context;
   }
 

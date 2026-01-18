@@ -105,6 +105,11 @@ export async function isSuperAdmin(
 
 /**
  * Check if actor can manage target user
+ * Rules:
+ * 1. Cannot manage yourself (for certain operations)
+ * 2. Only super admins can manage other super admins
+ * 3. Only users with system roles can manage users with system roles
+ * 4. Users can only manage other users with equal or lesser permissions
  */
 export async function canManageUser(
   supabase: SupabaseClient<Database>,
@@ -116,12 +121,66 @@ export async function canManageUser(
     return false;
   }
 
-  const actorIsSuperAdmin = await isSuperAdmin(supabase, actorId);
-  const targetIsSuperAdmin = await isSuperAdmin(supabase, targetUserId);
+  // Get actor's role info
+  const { data: actorUser } = await supabase
+    .from("users")
+    .select("role_id")
+    .eq("id", actorId)
+    .single();
+
+  if (!actorUser) return false;
+
+  const { data: actorRole } = await supabase
+    .from("roles")
+    .select("is_super_admin, is_system, permissions")
+    .eq("id", actorUser.role_id)
+    .single();
+
+  if (!actorRole) return false;
+
+  // Get target's role info
+  const { data: targetUser } = await supabase
+    .from("users")
+    .select("role_id")
+    .eq("id", targetUserId)
+    .single();
+
+  if (!targetUser) return false;
+
+  const { data: targetRole } = await supabase
+    .from("roles")
+    .select("is_super_admin, is_system, permissions")
+    .eq("id", targetUser.role_id)
+    .single();
+
+  if (!targetRole) return false;
 
   // Only super admins can manage other super admins
-  if (targetIsSuperAdmin && !actorIsSuperAdmin) {
+  if (targetRole.is_super_admin && !actorRole.is_super_admin) {
     return false;
+  }
+
+  // Super admins can manage anyone
+  if (actorRole.is_super_admin) {
+    return true;
+  }
+
+  // Non-system role users cannot manage users with system roles
+  // (e.g., custom role cannot manage Administrator)
+  if (targetRole.is_system && !actorRole.is_system) {
+    return false;
+  }
+
+  // For system roles, check permission count (more permissions = higher level)
+  // This prevents User Manager from managing Administrator
+  if (actorRole.is_system && targetRole.is_system) {
+    const actorPermCount = actorRole.permissions.includes("*") ? 999 : actorRole.permissions.length;
+    const targetPermCount = targetRole.permissions.includes("*") ? 999 : targetRole.permissions.length;
+
+    // Can only manage users with fewer or equal permissions
+    if (targetPermCount > actorPermCount) {
+      return false;
+    }
   }
 
   return true;
