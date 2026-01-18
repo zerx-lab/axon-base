@@ -3,6 +3,16 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/lib/supabase/access";
 import { Permissions } from "@/lib/supabase/permissions";
 
+/**
+ * Escape special characters for Supabase ilike queries
+ */
+function escapeSearchPattern(input: string): string {
+  return input
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_");
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = createAdminClient();
@@ -31,7 +41,8 @@ export async function GET(request: NextRequest) {
       .range(offset, offset + limit - 1);
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+      const escapedSearch = escapeSearchPattern(search);
+      query = query.or(`name.ilike.%${escapedSearch}%,description.ilike.%${escapedSearch}%`);
     }
 
     const { data: kbs, count, error } = await query;
