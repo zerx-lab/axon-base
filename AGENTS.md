@@ -160,6 +160,8 @@ const { t } = useI18n();
 - `roles` - 角色表 (id, name, description, permissions, is_system, is_super_admin)
 - `users` - 用户表 (id, username, password_hash, role_id, display_name, is_active)
 - `sessions` - 会话表 (id, user_id, token, expires_at)
+- `knowledge_bases` - 知识库表 (id, user_id, name, description, document_count, settings)
+- `documents` - 文档表 (id, kb_id, user_id, title, content, file_type, status, metadata)
 
 ### API Routes 结构
 ```
@@ -284,11 +286,50 @@ SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 
 ---
 
+## 数据库迁移工作流
+
+### Docker 管理
+
+```bash
+bun run docker:up         # 启动 Supabase Docker 环境
+bun run docker:down       # 停止环境
+bun run docker:logs       # 查看日志
+```
+
+### 数据库操作
+
+```bash
+bun run db:psql           # 进入 PostgreSQL 命令行
+bun run db:push           # 推送迁移到数据库
+bun run db:reset          # 重置数据库（清空 + 迁移 + seed）
+bun run db:diff           # 对比数据库差异
+bun run db:seed           # 仅执行种子数据
+```
+
+### 迁移文件结构
+
+```
+supabase/
+├── config.toml           # Supabase CLI 配置
+├── migrations/           # 迁移文件
+│   ├── 001_initial_schema.sql
+│   └── 002_knowledge_bases.sql
+└── seed.sql              # 种子数据
+```
+
+### 创建新迁移
+
+1. 在 `supabase/migrations/` 创建新 SQL 文件：`003_feature_name.sql`
+2. 执行：`bun run db:push`
+3. 更新 `lib/supabase/types.ts` 添加对应类型
+
+---
+
 ## 部署步骤
 
 1. 在 Supabase 创建新项目
-2. 运行 `supabase/migrations/001_initial_schema.sql` 创建表结构
-3. 运行 `supabase/seed.sql` 创建初始管理员（可选）
-4. 或访问 `/api/auth/seed` 自动初始化
+2. 运行 `supabase link --project-ref <project-id>` 连接项目
+3. 运行 `supabase db push` 应用迁移
+4. 运行 `supabase/seed.sql` 创建初始管理员
 5. 配置环境变量
 6. 部署应用

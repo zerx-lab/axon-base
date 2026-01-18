@@ -1,25 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { knowledgeBases, users, roles } from "@/lib/db/schema";
-import { eq, desc, sql, ilike, or, and } from "drizzle-orm";
-
-async function checkPermission(userId: string, permission: string): Promise<boolean> {
-  try {
-    const [user] = await db.select().from(users).where(eq(users.id, userId));
-    if (!user) return false;
-
-    const [role] = await db.select().from(roles).where(eq(roles.id, user.roleId));
-    if (!role) return false;
-
-    if (role.isSuperAdmin) return true;
-    return role.permissions?.includes(permission) || role.permissions?.includes("*") || false;
-  } catch {
-    return false;
-  }
-}
+import { createAdminClient } from "@/lib/supabase/server";
+import { hasPermission } from "@/lib/supabase/access";
+import { Permissions } from "@/lib/supabase/permissions";
 
 export async function GET(request: NextRequest) {
   try {
+    const supabase = createAdminClient();
     const searchParams = request.nextUrl.searchParams;
     const operatorId = searchParams.get("operatorId");
     const search = searchParams.get("search") || "";
@@ -27,52 +13,37 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
 
     if (!operatorId) {
-      return NextResponse.json(
-        { error: "Operator ID is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Operator ID is required" }, { status: 400 });
     }
 
-    const hasListPermission = await checkPermission(operatorId, "kb:list");
-    if (!hasListPermission) {
+    const canList = await hasPermission(supabase, operatorId, Permissions.KB_LIST);
+    if (!canList) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
     const offset = (page - 1) * limit;
 
-    const baseCondition = eq(knowledgeBases.userId, operatorId);
-    const whereCondition = search
-      ? and(
-          baseCondition,
-          or(
-            ilike(knowledgeBases.name, `%${search}%`),
-            ilike(knowledgeBases.description, `%${search}%`)
-          )
-        )
-      : baseCondition;
+    let query = supabase
+      .from("knowledge_bases")
+      .select("*", { count: "exact" })
+      .eq("user_id", operatorId)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
-    const [kbs, countResult] = await Promise.all([
-      db
-        .select()
-        .from(knowledgeBases)
-        .where(whereCondition)
-        .orderBy(desc(knowledgeBases.createdAt))
-        .limit(limit)
-        .offset(offset),
-      db
-        .select({ count: sql<number>`count(*)` })
-        .from(knowledgeBases)
-        .where(whereCondition),
-    ]);
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+    }
 
-    const total = Number(countResult[0]?.count || 0);
+    const { data: kbs, count, error } = await query;
+
+    if (error) throw error;
 
     return NextResponse.json({
       knowledgeBases: kbs,
-      total,
+      total: count || 0,
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil((count || 0) / limit),
     });
   } catch (error) {
     console.error("List knowledge bases error:", error);
@@ -82,29 +53,30 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createAdminClient();
     const body = await request.json();
     const { operatorId, name, description } = body;
 
     if (!operatorId || !name) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const hasCreatePermission = await checkPermission(operatorId, "kb:create");
-    if (!hasCreatePermission) {
+    const canCreate = await hasPermission(supabase, operatorId, Permissions.KB_CREATE);
+    if (!canCreate) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
-    const [newKb] = await db
-      .insert(knowledgeBases)
-      .values({
-        userId: operatorId,
+    const { data: newKb, error } = await supabase
+      .from("knowledge_bases")
+      .insert({
+        user_id: operatorId,
         name,
         description: description || null,
       })
-      .returning();
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json({ success: true, knowledgeBase: newKb }, { status: 201 });
   } catch (error) {
@@ -115,39 +87,41 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const supabase = createAdminClient();
     const body = await request.json();
     const { operatorId, kbId, name, description } = body;
 
     if (!operatorId || !kbId) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const hasUpdatePermission = await checkPermission(operatorId, "kb:update");
-    if (!hasUpdatePermission) {
+    const canUpdate = await hasPermission(supabase, operatorId, Permissions.KB_UPDATE);
+    if (!canUpdate) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
-    const [existingKb] = await db
-      .select()
-      .from(knowledgeBases)
-      .where(eq(knowledgeBases.id, kbId));
+    const { data: existingKb } = await supabase
+      .from("knowledge_bases")
+      .select("*")
+      .eq("id", kbId)
+      .single();
 
-    if (!existingKb || existingKb.userId !== operatorId) {
+    if (!existingKb || existingKb.user_id !== operatorId) {
       return NextResponse.json({ error: "Knowledge base not found" }, { status: 404 });
     }
 
-    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+    const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (name !== undefined) updateData.name = name;
     if (description !== undefined) updateData.description = description;
 
-    const [updatedKb] = await db
-      .update(knowledgeBases)
-      .set(updateData)
-      .where(eq(knowledgeBases.id, kbId))
-      .returning();
+    const { data: updatedKb, error } = await supabase
+      .from("knowledge_bases")
+      .update(updateData)
+      .eq("id", kbId)
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json({ success: true, knowledgeBase: updatedKb });
   } catch (error) {
@@ -158,32 +132,33 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = createAdminClient();
     const searchParams = request.nextUrl.searchParams;
     const operatorId = searchParams.get("operatorId");
     const kbId = searchParams.get("kbId");
 
     if (!operatorId || !kbId) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const hasDeletePermission = await checkPermission(operatorId, "kb:delete");
-    if (!hasDeletePermission) {
+    const canDelete = await hasPermission(supabase, operatorId, Permissions.KB_DELETE);
+    if (!canDelete) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
-    const [existingKb] = await db
-      .select()
-      .from(knowledgeBases)
-      .where(eq(knowledgeBases.id, kbId));
+    const { data: existingKb } = await supabase
+      .from("knowledge_bases")
+      .select("*")
+      .eq("id", kbId)
+      .single();
 
-    if (!existingKb || existingKb.userId !== operatorId) {
+    if (!existingKb || existingKb.user_id !== operatorId) {
       return NextResponse.json({ error: "Knowledge base not found" }, { status: 404 });
     }
 
-    await db.delete(knowledgeBases).where(eq(knowledgeBases.id, kbId));
+    const { error } = await supabase.from("knowledge_bases").delete().eq("id", kbId);
+
+    if (error) throw error;
 
     return NextResponse.json({ success: true });
   } catch (error) {

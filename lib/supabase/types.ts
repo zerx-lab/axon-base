@@ -130,6 +130,110 @@ export interface Database {
           }
         ];
       };
+      knowledge_bases: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          description: string | null;
+          document_count: number;
+          settings: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          description?: string | null;
+          document_count?: number;
+          settings?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          description?: string | null;
+          document_count?: number;
+          settings?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_bases_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      documents: {
+        Row: {
+          id: string;
+          kb_id: string;
+          user_id: string;
+          title: string;
+          content: string | null;
+          content_hash: string | null;
+          file_type: string;
+          word_count: number;
+          char_count: number;
+          status: string;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          kb_id: string;
+          user_id: string;
+          title: string;
+          content?: string | null;
+          content_hash?: string | null;
+          file_type?: string;
+          word_count?: number;
+          char_count?: number;
+          status?: string;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          kb_id?: string;
+          user_id?: string;
+          title?: string;
+          content?: string | null;
+          content_hash?: string | null;
+          file_type?: string;
+          word_count?: number;
+          char_count?: number;
+          status?: string;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "documents_kb_id_fkey";
+            columns: ["kb_id"];
+            isOneToOne: false;
+            referencedRelation: "knowledge_bases";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "documents_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -146,15 +250,14 @@ export interface Database {
   };
 }
 
-// Helper types
 export type Role = Database["public"]["Tables"]["roles"]["Row"];
 export type User = Database["public"]["Tables"]["users"]["Row"];
 export type Session = Database["public"]["Tables"]["sessions"]["Row"];
+export type KnowledgeBase = Database["public"]["Tables"]["knowledge_bases"]["Row"];
+export type Document = Database["public"]["Tables"]["documents"]["Row"];
 
-// Safe user type without password hash
 export type SafeUser = Omit<User, "password_hash">;
 
-// User with role information
 export interface UserWithRole extends SafeUser {
   role: Role;
   permissions: string[];

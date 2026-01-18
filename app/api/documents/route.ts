@@ -1,22 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { documents, knowledgeBases, users, roles } from "@/lib/db/schema";
-import { eq, desc, and, sql } from "drizzle-orm";
-
-async function checkPermission(userId: string, permission: string): Promise<boolean> {
-  try {
-    const [user] = await db.select().from(users).where(eq(users.id, userId));
-    if (!user) return false;
-
-    const [role] = await db.select().from(roles).where(eq(roles.id, user.roleId));
-    if (!role) return false;
-
-    if (role.isSuperAdmin) return true;
-    return role.permissions?.includes(permission) || role.permissions?.includes("*") || false;
-  } catch {
-    return false;
-  }
-}
+import { createAdminClient } from "@/lib/supabase/server";
+import { hasPermission } from "@/lib/supabase/access";
+import { Permissions } from "@/lib/supabase/permissions";
 
 function computeHash(content: string): string {
   let hash = 0;
@@ -36,6 +21,7 @@ function countWords(content: string): number {
 
 export async function GET(request: NextRequest) {
   try {
+    const supabase = createAdminClient();
     const searchParams = request.nextUrl.searchParams;
     const operatorId = searchParams.get("operatorId");
     const kbId = searchParams.get("kbId");
@@ -47,18 +33,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Operator ID is required" }, { status: 400 });
     }
 
-    const hasListPermission = await checkPermission(operatorId, "docs:list");
-    if (!hasListPermission) {
+    const canList = await hasPermission(supabase, operatorId, Permissions.DOCS_LIST);
+    if (!canList) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
     if (docId) {
-      const [doc] = await db
-        .select()
-        .from(documents)
-        .where(and(eq(documents.id, docId), eq(documents.userId, operatorId)));
+      const { data: doc, error } = await supabase
+        .from("documents")
+        .select("*")
+        .eq("id", docId)
+        .eq("user_id", operatorId)
+        .single();
 
-      if (!doc) {
+      if (error || !doc) {
         return NextResponse.json({ error: "Document not found" }, { status: 404 });
       }
       return NextResponse.json({ document: doc });
@@ -70,38 +58,22 @@ export async function GET(request: NextRequest) {
 
     const offset = (page - 1) * limit;
 
-    const [docs, countResult] = await Promise.all([
-      db
-        .select({
-          id: documents.id,
-          kbId: documents.kbId,
-          title: documents.title,
-          fileType: documents.fileType,
-          wordCount: documents.wordCount,
-          charCount: documents.charCount,
-          status: documents.status,
-          createdAt: documents.createdAt,
-          updatedAt: documents.updatedAt,
-        })
-        .from(documents)
-        .where(and(eq(documents.kbId, kbId), eq(documents.userId, operatorId)))
-        .orderBy(desc(documents.createdAt))
-        .limit(limit)
-        .offset(offset),
-      db
-        .select({ count: sql<number>`count(*)` })
-        .from(documents)
-        .where(and(eq(documents.kbId, kbId), eq(documents.userId, operatorId))),
-    ]);
+    const { data: docs, count, error } = await supabase
+      .from("documents")
+      .select("id, kb_id, title, file_type, word_count, char_count, status, created_at, updated_at", { count: "exact" })
+      .eq("kb_id", kbId)
+      .eq("user_id", operatorId)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
-    const total = Number(countResult[0]?.count || 0);
+    if (error) throw error;
 
     return NextResponse.json({
       documents: docs,
-      total,
+      total: count || 0,
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil((count || 0) / limit),
     });
   } catch (error) {
     console.error("List documents error:", error);
@@ -111,6 +83,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createAdminClient();
     const body = await request.json();
     const { operatorId, kbId, title, content } = body;
 
@@ -118,17 +91,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const hasCreatePermission = await checkPermission(operatorId, "docs:create");
-    if (!hasCreatePermission) {
+    const canCreate = await hasPermission(supabase, operatorId, Permissions.DOCS_CREATE);
+    if (!canCreate) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
-    const [kb] = await db
-      .select()
-      .from(knowledgeBases)
-      .where(and(eq(knowledgeBases.id, kbId), eq(knowledgeBases.userId, operatorId)));
+    const { data: kb, error: kbError } = await supabase
+      .from("knowledge_bases")
+      .select("*")
+      .eq("id", kbId)
+      .eq("user_id", operatorId)
+      .single();
 
-    if (!kb) {
+    if (kbError || !kb) {
       return NextResponse.json({ error: "Knowledge base not found" }, { status: 404 });
     }
 
@@ -136,24 +111,30 @@ export async function POST(request: NextRequest) {
     const wordCount = countWords(content);
     const charCount = content.length;
 
-    const [newDoc] = await db
-      .insert(documents)
-      .values({
-        kbId,
-        userId: operatorId,
+    const { data: newDoc, error } = await supabase
+      .from("documents")
+      .insert({
+        kb_id: kbId,
+        user_id: operatorId,
         title,
         content,
-        contentHash,
-        wordCount,
-        charCount,
-        fileType: "markdown",
+        content_hash: contentHash,
+        word_count: wordCount,
+        char_count: charCount,
+        file_type: "markdown",
       })
-      .returning();
+      .select()
+      .single();
 
-    await db
-      .update(knowledgeBases)
-      .set({ documentCount: sql`${knowledgeBases.documentCount} + 1`, updatedAt: new Date() })
-      .where(eq(knowledgeBases.id, kbId));
+    if (error) throw error;
+
+    await supabase
+      .from("knowledge_bases")
+      .update({ 
+        document_count: kb.document_count + 1, 
+        updated_at: new Date().toISOString() 
+      })
+      .eq("id", kbId);
 
     return NextResponse.json({ success: true, document: newDoc }, { status: 201 });
   } catch (error) {
@@ -164,6 +145,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const supabase = createAdminClient();
     const body = await request.json();
     const { operatorId, docId, title, content, status } = body;
 
@@ -171,36 +153,40 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const hasUpdatePermission = await checkPermission(operatorId, "docs:update");
-    if (!hasUpdatePermission) {
+    const canUpdate = await hasPermission(supabase, operatorId, Permissions.DOCS_UPDATE);
+    if (!canUpdate) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
-    const [existingDoc] = await db
-      .select()
-      .from(documents)
-      .where(eq(documents.id, docId));
+    const { data: existingDoc } = await supabase
+      .from("documents")
+      .select("*")
+      .eq("id", docId)
+      .single();
 
-    if (!existingDoc || existingDoc.userId !== operatorId) {
+    if (!existingDoc || existingDoc.user_id !== operatorId) {
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
     }
 
-    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+    const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (title !== undefined) updateData.title = title;
     if (status !== undefined) updateData.status = status;
 
     if (content !== undefined) {
       updateData.content = content;
-      updateData.contentHash = computeHash(content);
-      updateData.wordCount = countWords(content);
-      updateData.charCount = content.length;
+      updateData.content_hash = computeHash(content);
+      updateData.word_count = countWords(content);
+      updateData.char_count = content.length;
     }
 
-    const [updatedDoc] = await db
-      .update(documents)
-      .set(updateData)
-      .where(eq(documents.id, docId))
-      .returning();
+    const { data: updatedDoc, error } = await supabase
+      .from("documents")
+      .update(updateData)
+      .eq("id", docId)
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json({ success: true, document: updatedDoc });
   } catch (error) {
@@ -211,6 +197,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = createAdminClient();
     const searchParams = request.nextUrl.searchParams;
     const operatorId = searchParams.get("operatorId");
     const docId = searchParams.get("docId");
@@ -219,26 +206,40 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const hasDeletePermission = await checkPermission(operatorId, "docs:delete");
-    if (!hasDeletePermission) {
+    const canDelete = await hasPermission(supabase, operatorId, Permissions.DOCS_DELETE);
+    if (!canDelete) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
-    const [existingDoc] = await db
-      .select()
-      .from(documents)
-      .where(eq(documents.id, docId));
+    const { data: existingDoc } = await supabase
+      .from("documents")
+      .select("*")
+      .eq("id", docId)
+      .single();
 
-    if (!existingDoc || existingDoc.userId !== operatorId) {
+    if (!existingDoc || existingDoc.user_id !== operatorId) {
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
     }
 
-    await db.delete(documents).where(eq(documents.id, docId));
+    const { error } = await supabase.from("documents").delete().eq("id", docId);
 
-    await db
-      .update(knowledgeBases)
-      .set({ documentCount: sql`${knowledgeBases.documentCount} - 1`, updatedAt: new Date() })
-      .where(eq(knowledgeBases.id, existingDoc.kbId));
+    if (error) throw error;
+
+    const { data: kb } = await supabase
+      .from("knowledge_bases")
+      .select("document_count")
+      .eq("id", existingDoc.kb_id)
+      .single();
+
+    if (kb) {
+      await supabase
+        .from("knowledge_bases")
+        .update({ 
+          document_count: Math.max(0, kb.document_count - 1), 
+          updated_at: new Date().toISOString() 
+        })
+        .eq("id", existingDoc.kb_id);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
