@@ -34,6 +34,11 @@ export const PERMISSIONS = {
   DOCS_CREATE: "docs:create",
   DOCS_UPDATE: "docs:update",
   DOCS_DELETE: "docs:delete",
+
+  // Embedding permissions
+  EMBEDDING_VIEW: "embedding:view",
+  EMBEDDING_MANAGE: "embedding:manage",
+  EMBEDDING_SEARCH: "embedding:search",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

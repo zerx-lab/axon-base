@@ -6,6 +6,8 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
+export type EmbeddingStatus = "pending" | "processing" | "completed" | "failed" | "outdated";
+
 export interface Database {
   public: {
     Tables: {
@@ -183,6 +185,7 @@ export interface Database {
           word_count: number;
           char_count: number;
           status: string;
+          embedding_status: EmbeddingStatus;
           metadata: Json;
           created_at: string;
           updated_at: string;
@@ -198,6 +201,7 @@ export interface Database {
           word_count?: number;
           char_count?: number;
           status?: string;
+          embedding_status?: EmbeddingStatus;
           metadata?: Json;
           created_at?: string;
           updated_at?: string;
@@ -213,6 +217,7 @@ export interface Database {
           word_count?: number;
           char_count?: number;
           status?: string;
+          embedding_status?: EmbeddingStatus;
           metadata?: Json;
           created_at?: string;
           updated_at?: string;
@@ -228,6 +233,85 @@ export interface Database {
           {
             foreignKeyName: "documents_user_id_fkey";
             columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      document_chunks: {
+        Row: {
+          id: string;
+          document_id: string;
+          chunk_index: number;
+          content: string;
+          content_hash: string;
+          token_count: number;
+          embedding: number[] | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          document_id: string;
+          chunk_index: number;
+          content: string;
+          content_hash: string;
+          token_count?: number;
+          embedding?: number[] | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          document_id?: string;
+          chunk_index?: number;
+          content?: string;
+          content_hash?: string;
+          token_count?: number;
+          embedding?: number[] | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "document_chunks_document_id_fkey";
+            columns: ["document_id"];
+            isOneToOne: false;
+            referencedRelation: "documents";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      system_settings: {
+        Row: {
+          id: string;
+          key: string;
+          value: Json;
+          description: string | null;
+          updated_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          key: string;
+          value: Json;
+          description?: string | null;
+          updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          key?: string;
+          value?: Json;
+          description?: string | null;
+          updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "system_settings_updated_by_fkey";
+            columns: ["updated_by"];
             isOneToOne: false;
             referencedRelation: "users";
             referencedColumns: ["id"];
@@ -257,9 +341,64 @@ export type KnowledgeBase = Database["public"]["Tables"]["knowledge_bases"]["Row
 export type Document = Database["public"]["Tables"]["documents"]["Row"];
 
 export type SafeUser = Omit<User, "password_hash">;
+export type DocumentChunk = Database["public"]["Tables"]["document_chunks"]["Row"];
 
 export interface UserWithRole extends SafeUser {
   role: Role;
   permissions: string[];
   isSuperAdmin: boolean;
+}
+
+export interface EmbeddingConfig {
+  provider: "openai" | "azure" | "local" | "aliyun";
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  dimensions: number;
+  batchSize: number;
+  chunkSize: number;
+  chunkOverlap: number;
+}
+
+export type ChatProvider = "openai" | "anthropic" | "openai-compatible";
+
+export interface ChatConfig {
+  provider: ChatProvider;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  maxTokens: number;
+  temperature: number;
+}
+
+export interface EmbeddingSettings {
+  model: string;
+  provider: "openai" | "local";
+  dimensions: number;
+  chunkSize: number;
+  chunkOverlap: number;
+}
+
+export type SystemSetting = Database["public"]["Tables"]["system_settings"]["Row"];
+
+export interface KnowledgeBaseSettings {
+  embedding?: EmbeddingSettings;
+}
+
+export interface EmbeddingStats {
+  total_documents: number;
+  embedded_documents: number;
+  pending_documents: number;
+  failed_documents: number;
+  outdated_documents: number;
+  total_chunks: number;
+}
+
+export interface SimilarChunk {
+  chunk_id: string;
+  document_id: string;
+  document_title: string;
+  chunk_content: string;
+  chunk_index: number;
+  similarity: number;
 }

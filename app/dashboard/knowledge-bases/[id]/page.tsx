@@ -14,6 +14,7 @@ interface Document {
   content?: string;
   wordCount: number;
   status: string;
+  embeddingStatus: "pending" | "processing" | "completed" | "failed" | "outdated";
   createdAt: string;
   updatedAt: string;
 }
@@ -37,12 +38,14 @@ export default function DocumentsPage() {
   const canCreateDoc = hasPermission(PERMISSIONS.DOCS_CREATE);
   const canUpdateDoc = hasPermission(PERMISSIONS.DOCS_UPDATE);
   const canDeleteDoc = hasPermission(PERMISSIONS.DOCS_DELETE);
+  const canManageEmbedding = hasPermission(PERMISSIONS.EMBEDDING_MANAGE);
   
   const [documents, setDocuments] = useState<Document[]>([]);
   const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeBase | null>(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [embeddingLoading, setEmbeddingLoading] = useState<Map<string, boolean>>(new Map());
 
   const [dialogType, setDialogType] = useState<DialogType>(null);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
@@ -297,6 +300,69 @@ export default function DocumentsPage() {
     router.push("/dashboard/knowledge-bases");
   };
 
+  const handleEmbed = async (docId: string) => {
+    if (!currentUserId) return;
+
+    setEmbeddingLoading(prev => new Map(prev).set(docId, true));
+    try {
+      const response = await fetch("/api/embeddings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operatorId: currentUserId,
+          action: "embed_document",
+          docId: docId,
+        }),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        fetchDocuments();
+      } else {
+        setFormError(result.error || t("embedding.embedFailed"));
+      }
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : t("embedding.embedFailed"));
+    } finally {
+      setEmbeddingLoading(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(docId);
+        return newMap;
+      });
+    }
+  };
+
+  const handleDeleteEmbedding = async (docId: string) => {
+    if (!currentUserId) return;
+
+    setEmbeddingLoading(prev => new Map(prev).set(docId, true));
+    try {
+      const params = new URLSearchParams({
+        operatorId: currentUserId,
+        docId: docId,
+      });
+
+      const response = await fetch(`/api/embeddings?${params}`, {
+        method: "DELETE",
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        fetchDocuments();
+      } else {
+        setFormError(result.error || t("embedding.deleteFailed"));
+      }
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : t("embedding.deleteFailed"));
+    } finally {
+      setEmbeddingLoading(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(docId);
+        return newMap;
+      });
+    }
+  };
+
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -333,7 +399,7 @@ export default function DocumentsPage() {
       </div>
 
       <div className="border border-border">
-        <div className="grid grid-cols-[2fr_120px_120px_160px_180px] gap-4 border-b border-border bg-card px-4 py-3">
+        <div className="grid grid-cols-[2fr_120px_120px_150px_160px_220px] gap-4 border-b border-border bg-card px-4 py-3">
           <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
             {t("docs.docTitle")}
           </div>
@@ -342,6 +408,9 @@ export default function DocumentsPage() {
           </div>
           <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
             {t("docs.status")}
+          </div>
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+            {t("embedding.status")}
           </div>
           <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
             {t("common.createdAt")}
@@ -363,7 +432,7 @@ export default function DocumentsPage() {
           documents.map((doc) => (
             <div
               key={doc.id}
-              className="grid grid-cols-[2fr_120px_120px_160px_180px] gap-4 border-b border-border px-4 py-3 last:border-b-0 hover:bg-card/50"
+              className="grid grid-cols-[2fr_120px_120px_150px_160px_220px] gap-4 border-b border-border px-4 py-3 last:border-b-0 hover:bg-card/50"
             >
               <div className="font-mono text-sm">{doc.title}</div>
               <div className="font-mono text-sm text-muted">
@@ -373,6 +442,34 @@ export default function DocumentsPage() {
                 <span className="inline-block border border-border px-2 py-0.5 font-mono text-[10px] uppercase">
                   {doc.status}
                 </span>
+              </div>
+              <div>
+                {doc.embeddingStatus === "pending" && (
+                  <span className="inline-block border border-border bg-muted/20 px-2 py-0.5 font-mono text-[10px] uppercase text-muted">
+                    {t("embedding.pending")}
+                  </span>
+                )}
+                {doc.embeddingStatus === "processing" && (
+                  <span className="inline-flex items-center gap-1 border border-blue-500/50 bg-blue-500/10 px-2 py-0.5 font-mono text-[10px] uppercase text-blue-500">
+                    <SpinnerIcon className="h-2.5 w-2.5 animate-spin" />
+                    {t("embedding.processing")}
+                  </span>
+                )}
+                {doc.embeddingStatus === "completed" && (
+                  <span className="inline-block border border-green-500/50 bg-green-500/10 px-2 py-0.5 font-mono text-[10px] uppercase text-green-500">
+                    {t("embedding.completed")}
+                  </span>
+                )}
+                {doc.embeddingStatus === "failed" && (
+                  <span className="inline-block border border-red-500/50 bg-red-500/10 px-2 py-0.5 font-mono text-[10px] uppercase text-red-500">
+                    {t("embedding.failed")}
+                  </span>
+                )}
+                {doc.embeddingStatus === "outdated" && (
+                  <span className="inline-block border border-yellow-500/50 bg-yellow-500/10 px-2 py-0.5 font-mono text-[10px] uppercase text-yellow-500">
+                    {t("embedding.outdated")}
+                  </span>
+                )}
               </div>
               <div className="font-mono text-xs text-muted">
                 {new Date(doc.createdAt).toLocaleDateString()}
@@ -402,6 +499,35 @@ export default function DocumentsPage() {
                   >
                     <TrashIcon className="h-3.5 w-3.5" />
                   </button>
+                )}
+                {canManageEmbedding && (
+                  <>
+                    {embeddingLoading.get(doc.id) ? (
+                      <button
+                        disabled
+                        className="flex h-7 w-7 items-center justify-center text-muted"
+                      >
+                        <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
+                      </button>
+                    ) : doc.embeddingStatus === "completed" ? (
+                      <button
+                        onClick={() => handleDeleteEmbedding(doc.id)}
+                        className="flex h-7 w-7 items-center justify-center text-muted hover:text-red-500"
+                        title={t("embedding.deleteEmbedding")}
+                      >
+                        <TrashEmbeddingIcon className="h-3.5 w-3.5" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleEmbed(doc.id)}
+                        className="flex h-7 w-7 items-center justify-center text-muted hover:text-blue-500"
+                        title={t("embedding.embed")}
+                        disabled={doc.embeddingStatus === "processing"}
+                      >
+                        <LightningIcon className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -585,6 +711,31 @@ function ArrowLeftIcon({ className }: { readonly className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M19 12H5M12 19l-7-7 7-7" />
+    </svg>
+  );
+}
+
+function LightningIcon({ className }: { readonly className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z" />
+    </svg>
+  );
+}
+
+function SpinnerIcon({ className }: { readonly className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" opacity="0.4" />
+      <path d="M12 2v4" />
+    </svg>
+  );
+}
+
+function TrashEmbeddingIcon({ className }: { readonly className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />
     </svg>
   );
 }

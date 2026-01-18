@@ -72,3 +72,6 @@ CREATE POLICY "Service role has full access to documents"
     ON documents FOR ALL
     USING (true)
     WITH CHECK (true);
+
+GRANT ALL PRIVILEGES ON TABLE knowledge_bases TO anon, authenticated, service_role;
+GRANT ALL PRIVILEGES ON TABLE documents TO anon, authenticated, service_role;

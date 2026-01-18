@@ -110,6 +110,17 @@ CREATE POLICY "Service role has full access to sessions"
     WITH CHECK (true);
 
 -- ============================================
+-- GRANT PERMISSIONS TO SUPABASE ROLES
+-- ============================================
+-- Grant table permissions to Supabase roles
+GRANT ALL PRIVILEGES ON TABLE roles TO anon, authenticated, service_role;
+GRANT ALL PRIVILEGES ON TABLE users TO anon, authenticated, service_role;
+GRANT ALL PRIVILEGES ON TABLE sessions TO anon, authenticated, service_role;
+
+-- Grant sequence permissions
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+
+-- ============================================
 -- SEED SYSTEM ROLES
 -- ============================================
 INSERT INTO roles (name, description, permissions, is_system, is_super_admin) VALUES

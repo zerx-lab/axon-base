@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
 
     const { data: docs, count, error } = await supabase
       .from("documents")
-      .select("id, kb_id, title, file_type, word_count, char_count, status, created_at, updated_at", { count: "exact" })
+      .select("id, kb_id, title, file_type, word_count, char_count, status, embedding_status, created_at, updated_at", { count: "exact" })
       .eq("kb_id", kbId)
       .eq("user_id", operatorId)
       .order("created_at", { ascending: false })
@@ -68,8 +68,21 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
+    const transformedDocs = docs?.map(doc => ({
+      id: doc.id,
+      kbId: doc.kb_id,
+      title: doc.title,
+      fileType: doc.file_type,
+      wordCount: doc.word_count,
+      charCount: doc.char_count,
+      status: doc.status,
+      embeddingStatus: doc.embedding_status || "pending",
+      createdAt: doc.created_at,
+      updatedAt: doc.updated_at,
+    }));
+
     return NextResponse.json({
-      documents: docs,
+      documents: transformedDocs,
       total: count || 0,
       page,
       limit,

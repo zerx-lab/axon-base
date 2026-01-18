@@ -16,6 +16,12 @@ interface KnowledgeBase {
   updated_at: string;
 }
 
+interface EmbeddingStats {
+  embedded: number;
+  total: number;
+  pending: number;
+}
+
 type DialogType = "create" | "edit" | "delete" | null;
 
 export default function KnowledgeBasesPage() {
@@ -27,11 +33,14 @@ export default function KnowledgeBasesPage() {
   const canCreateKB = hasPermission(PERMISSIONS.KB_CREATE);
   const canUpdateKB = hasPermission(PERMISSIONS.KB_UPDATE);
   const canDeleteKB = hasPermission(PERMISSIONS.KB_DELETE);
+  const canManageEmbedding = hasPermission(PERMISSIONS.EMBEDDING_MANAGE);
   
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
+  const [embeddingStats, setEmbeddingStats] = useState<Map<string, EmbeddingStats>>(new Map());
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [embeddingLoading, setEmbeddingLoading] = useState<Set<string>>(new Set());
 
   const [dialogType, setDialogType] = useState<DialogType>(null);
   const [selectedKB, setSelectedKB] = useState<KnowledgeBase | null>(null);
@@ -43,6 +52,34 @@ export default function KnowledgeBasesPage() {
   const [formError, setFormError] = useState("");
 
   const currentUserId = authUser?.id;
+
+  const fetchEmbeddingStats = useCallback(async (kbId: string) => {
+    if (!currentUserId) return;
+    
+    try {
+      const params = new URLSearchParams({
+        kbId,
+        operatorId: currentUserId,
+      });
+      
+      const response = await fetch(`/api/embeddings?${params}`);
+      const result = await response.json();
+      
+      if (result.success && result.stats) {
+        setEmbeddingStats(prev => {
+          const newStats = new Map(prev);
+          newStats.set(kbId, {
+            embedded: result.stats.embedded || 0,
+            total: result.stats.total || 0,
+            pending: result.stats.pending || 0,
+          });
+          return newStats;
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch embedding stats:", error);
+    }
+  }, [currentUserId]);
 
   const fetchKnowledgeBases = useCallback(async () => {
     if (!currentUserId || !canListKB) return;
@@ -61,13 +98,16 @@ export default function KnowledgeBasesPage() {
       
       if (result.knowledgeBases) {
         setKnowledgeBases(result.knowledgeBases);
+        result.knowledgeBases.forEach((kb: KnowledgeBase) => {
+          fetchEmbeddingStats(kb.id);
+        });
       }
     } catch (error) {
       console.error("Failed to fetch knowledge bases:", error);
     } finally {
       setLoading(false);
     }
-  }, [currentUserId, search, canListKB]);
+  }, [currentUserId, search, canListKB, fetchEmbeddingStats]);
 
   useEffect(() => {
     fetchKnowledgeBases();
@@ -220,6 +260,36 @@ export default function KnowledgeBasesPage() {
     router.push(`/dashboard/knowledge-bases/${kb.id}`);
   };
 
+  const handleEmbedAll = async (kbId: string) => {
+    if (!currentUserId) return;
+
+    setEmbeddingLoading(prev => new Set(prev).add(kbId));
+    try {
+      const response = await fetch("/api/embeddings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operatorId: currentUserId,
+          action: "embed_kb",
+          kbId,
+        }),
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        await fetchEmbeddingStats(kbId);
+      }
+    } catch (error) {
+      console.error("Failed to embed all documents:", error);
+    } finally {
+      setEmbeddingLoading(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(kbId);
+        return newSet;
+      });
+    }
+  };
+
   return (
     <div className="p-8">
       <div className="mb-8 flex items-center justify-between">
@@ -229,12 +299,14 @@ export default function KnowledgeBasesPage() {
             {knowledgeBases.length} {t("kb.knowledgeBase").toLowerCase()}(s)
           </p>
         </div>
-        {canCreateKB && (
-          <Button onClick={openCreateDialog}>
-            <PlusIcon className="mr-2 h-3 w-3" />
-            {t("kb.create")}
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {canCreateKB && (
+            <Button onClick={openCreateDialog}>
+              <PlusIcon className="mr-2 h-3 w-3" />
+              {t("kb.create")}
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="mb-6">
@@ -247,7 +319,7 @@ export default function KnowledgeBasesPage() {
       </div>
 
       <div className="border border-border">
-        <div className="grid grid-cols-[2fr_3fr_120px_160px_140px] gap-4 border-b border-border bg-card px-4 py-3">
+        <div className="grid grid-cols-[2fr_3fr_120px_120px_160px_180px] gap-4 border-b border-border bg-card px-4 py-3">
           <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
             {t("kb.name")}
           </div>
@@ -256,6 +328,9 @@ export default function KnowledgeBasesPage() {
           </div>
           <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
             {t("kb.documentCount")}
+          </div>
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+            {t("embedding.status")}
           </div>
           <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
             {t("common.createdAt")}
@@ -274,50 +349,78 @@ export default function KnowledgeBasesPage() {
             <span className="font-mono text-xs text-muted">{t("common.noData")}</span>
           </div>
         ) : (
-          knowledgeBases.map((kb) => (
-            <div
-              key={kb.id}
-              className="grid grid-cols-[2fr_3fr_120px_160px_140px] gap-4 border-b border-border px-4 py-3 last:border-b-0 hover:bg-card/50"
-            >
-              <div className="font-mono text-sm">{kb.name}</div>
-              <div className="font-mono text-sm text-muted">
-                {kb.description || "-"}
-              </div>
-              <div className="font-mono text-sm text-muted">
-                {kb.document_count}
-              </div>
-              <div className="font-mono text-xs text-muted">
-                {new Date(kb.created_at).toLocaleDateString()}
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => handleViewKB(kb)}
-                  className="flex h-7 w-7 items-center justify-center text-muted hover:text-foreground"
-                  title={t("common.view")}
-                >
-                  <EyeIcon className="h-3.5 w-3.5" />
-                </button>
-                {canUpdateKB && (
+          knowledgeBases.map((kb) => {
+            const stats = embeddingStats.get(kb.id);
+            const isEmbedding = embeddingLoading.has(kb.id);
+            
+            return (
+              <div
+                key={kb.id}
+                className="grid grid-cols-[2fr_3fr_120px_120px_160px_180px] gap-4 border-b border-border px-4 py-3 last:border-b-0 hover:bg-card/50"
+              >
+                <div className="font-mono text-sm">{kb.name}</div>
+                <div className="font-mono text-sm text-muted">
+                  {kb.description || "-"}
+                </div>
+                <div className="font-mono text-sm text-muted">
+                  {kb.document_count}
+                </div>
+                <div className="font-mono text-xs text-muted">
+                  {stats ? (
+                    <span className={stats.embedded === stats.total && stats.total > 0 ? "text-green-600" : ""}>
+                      {stats.embedded}/{stats.total} {t("embedding.embeddedDocs").toLowerCase()}
+                    </span>
+                  ) : (
+                    "-"
+                  )}
+                </div>
+                <div className="font-mono text-xs text-muted">
+                  {new Date(kb.created_at).toLocaleDateString()}
+                </div>
+                <div className="flex items-center gap-1">
                   <button
-                    onClick={() => openEditDialog(kb)}
+                    onClick={() => handleViewKB(kb)}
                     className="flex h-7 w-7 items-center justify-center text-muted hover:text-foreground"
-                    title={t("common.edit")}
+                    title={t("common.view")}
                   >
-                    <EditIcon className="h-3.5 w-3.5" />
+                    <EyeIcon className="h-3.5 w-3.5" />
                   </button>
-                )}
-                {canDeleteKB && (
-                  <button
-                    onClick={() => openDeleteDialog(kb)}
-                    className="flex h-7 w-7 items-center justify-center text-muted hover:text-red-500"
-                    title={t("common.delete")}
-                  >
-                    <TrashIcon className="h-3.5 w-3.5" />
-                  </button>
-                )}
+                  {canManageEmbedding && stats && stats.pending > 0 && (
+                    <button
+                      onClick={() => handleEmbedAll(kb.id)}
+                      disabled={isEmbedding}
+                      className="flex h-7 w-7 items-center justify-center text-muted hover:text-foreground disabled:opacity-50"
+                      title={t("embedding.embedAll")}
+                    >
+                      {isEmbedding ? (
+                        <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <SparklesIcon className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  )}
+                  {canUpdateKB && (
+                    <button
+                      onClick={() => openEditDialog(kb)}
+                      className="flex h-7 w-7 items-center justify-center text-muted hover:text-foreground"
+                      title={t("common.edit")}
+                    >
+                      <EditIcon className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  {canDeleteKB && (
+                    <button
+                      onClick={() => openDeleteDialog(kb)}
+                      className="flex h-7 w-7 items-center justify-center text-muted hover:text-red-500"
+                      title={t("common.delete")}
+                    >
+                      <TrashIcon className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -446,6 +549,22 @@ function EyeIcon({ className }: { readonly className?: string }) {
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
       <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function SparklesIcon({ className }: { readonly className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
+
+function SpinnerIcon({ className }: { readonly className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
     </svg>
   );
 }

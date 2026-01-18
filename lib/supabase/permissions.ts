@@ -20,6 +20,9 @@ export const Permissions = {
   DOCS_CREATE: "docs:create",
   DOCS_UPDATE: "docs:update",
   DOCS_DELETE: "docs:delete",
+  EMBEDDING_VIEW: "embedding:view",
+  EMBEDDING_MANAGE: "embedding:manage",
+  EMBEDDING_SEARCH: "embedding:search",
 } as const;
 
 export type Permission = (typeof Permissions)[keyof typeof Permissions];
@@ -108,6 +111,18 @@ export const permissionsMeta: Record<
   [Permissions.DOCS_DELETE]: {
     i18nKey: "permission.docs.delete",
     category: "docs",
+  },
+  [Permissions.EMBEDDING_VIEW]: {
+    i18nKey: "permission.embedding.view",
+    category: "embedding",
+  },
+  [Permissions.EMBEDDING_MANAGE]: {
+    i18nKey: "permission.embedding.manage",
+    category: "embedding",
+  },
+  [Permissions.EMBEDDING_SEARCH]: {
+    i18nKey: "permission.embedding.search",
+    category: "embedding",
   },
 };
 

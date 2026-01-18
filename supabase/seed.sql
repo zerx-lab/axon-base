@@ -7,13 +7,14 @@ INSERT INTO roles (name, description, permissions, is_system, is_super_admin) VA
               'roles:list', 'roles:create', 'roles:update', 'roles:delete', 
               'system:settings', 'system:logs',
               'kb:list', 'kb:create', 'kb:update', 'kb:delete',
-              'docs:list', 'docs:create', 'docs:update', 'docs:delete'], 
+              'docs:list', 'docs:create', 'docs:update', 'docs:delete',
+              'embedding:view', 'embedding:manage', 'embedding:search'], 
         TRUE, FALSE),
     ('User Manager', 'Can manage users', 
         ARRAY['users:list', 'users:create', 'users:update', 'users:toggle_active', 'users:reset_password'], 
         TRUE, FALSE),
     ('Viewer', 'Read-only access', 
-        ARRAY['users:list', 'roles:list', 'kb:list', 'docs:list'], 
+        ARRAY['users:list', 'roles:list', 'kb:list', 'docs:list', 'embedding:view', 'embedding:search'], 
         TRUE, FALSE)
 ON CONFLICT (name) DO NOTHING;
 
