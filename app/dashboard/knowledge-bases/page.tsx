@@ -1,0 +1,451 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { useI18n } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth-context";
+import { Button, Input, Dialog } from "@/components/ui";
+import { useRouter } from "next/navigation";
+import { PERMISSIONS } from "@/lib/permissions";
+
+interface KnowledgeBase {
+  id: string;
+  name: string;
+  description: string | null;
+  document_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+type DialogType = "create" | "edit" | "delete" | null;
+
+export default function KnowledgeBasesPage() {
+  const { t } = useI18n();
+  const { user: authUser, isLoading: authLoading, hasPermission } = useAuth();
+  const router = useRouter();
+  
+  const canListKB = hasPermission(PERMISSIONS.KB_LIST);
+  const canCreateKB = hasPermission(PERMISSIONS.KB_CREATE);
+  const canUpdateKB = hasPermission(PERMISSIONS.KB_UPDATE);
+  const canDeleteKB = hasPermission(PERMISSIONS.KB_DELETE);
+  
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const [dialogType, setDialogType] = useState<DialogType>(null);
+  const [selectedKB, setSelectedKB] = useState<KnowledgeBase | null>(null);
+
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+  });
+  const [formError, setFormError] = useState("");
+
+  const currentUserId = authUser?.id;
+
+  const fetchKnowledgeBases = useCallback(async () => {
+    if (!currentUserId || !canListKB) return;
+    
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        operatorId: currentUserId,
+      });
+      if (search) {
+        params.append("search", search);
+      }
+      
+      const response = await fetch(`/api/kb?${params}`);
+      const result = await response.json();
+      
+      if (result.knowledgeBases) {
+        setKnowledgeBases(result.knowledgeBases);
+      }
+    } catch (error) {
+      console.error("Failed to fetch knowledge bases:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUserId, search, canListKB]);
+
+  useEffect(() => {
+    fetchKnowledgeBases();
+  }, [fetchKnowledgeBases]);
+  
+  useEffect(() => {
+    if (!authLoading && !authUser) {
+      router.push("/login");
+    }
+  }, [authLoading, authUser, router]);
+  
+  if (!authLoading && authUser && !canListKB) {
+    return (
+      <div className="flex h-full items-center justify-center p-8">
+        <div className="text-center">
+          <h2 className="font-mono text-lg font-medium text-red-500">{t("error.accessDenied")}</h2>
+          <p className="mt-2 font-mono text-sm text-muted">{t("error.noPermission")}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const openCreateDialog = () => {
+    setFormData({
+      name: "",
+      description: "",
+    });
+    setFormError("");
+    setDialogType("create");
+  };
+
+  const openEditDialog = (kb: KnowledgeBase) => {
+    setSelectedKB(kb);
+    setFormData({
+      name: kb.name,
+      description: kb.description || "",
+    });
+    setFormError("");
+    setDialogType("edit");
+  };
+
+  const openDeleteDialog = (kb: KnowledgeBase) => {
+    setSelectedKB(kb);
+    setDialogType("delete");
+  };
+
+  const closeDialog = () => {
+    setDialogType(null);
+    setSelectedKB(null);
+    setFormError("");
+  };
+
+  const handleCreate = async () => {
+    if (!currentUserId) return;
+    if (!formData.name) {
+      setFormError(t("kb.nameRequired"));
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const response = await fetch("/api/kb", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operatorId: currentUserId,
+          name: formData.name,
+          description: formData.description || undefined,
+        }),
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        closeDialog();
+        fetchKnowledgeBases();
+      } else {
+        setFormError(result.error || t("error.createFailed"));
+      }
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : t("error.createFailed"));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUpdate = async () => {
+    if (!currentUserId || !selectedKB) return;
+
+    if (!formData.name) {
+      setFormError(t("kb.nameRequired"));
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const response = await fetch("/api/kb", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operatorId: currentUserId,
+          kbId: selectedKB.id,
+          name: formData.name,
+          description: formData.description,
+        }),
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        closeDialog();
+        fetchKnowledgeBases();
+      } else {
+        setFormError(result.error || t("error.updateFailed"));
+      }
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : t("error.updateFailed"));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!currentUserId || !selectedKB) return;
+
+    setActionLoading(true);
+    try {
+      const params = new URLSearchParams({
+        operatorId: currentUserId,
+        kbId: selectedKB.id,
+      });
+      
+      const response = await fetch(`/api/kb?${params}`, {
+        method: "DELETE",
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        closeDialog();
+        fetchKnowledgeBases();
+      } else {
+        setFormError(result.error || t("error.deleteFailed"));
+      }
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : t("error.deleteFailed"));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleViewKB = (kb: KnowledgeBase) => {
+    router.push(`/dashboard/knowledge-bases/${kb.id}`);
+  };
+
+  return (
+    <div className="p-8">
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="font-mono text-xl font-medium">{t("kb.title")}</h1>
+          <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted">
+            {knowledgeBases.length} {t("kb.knowledgeBase").toLowerCase()}(s)
+          </p>
+        </div>
+        {canCreateKB && (
+          <Button onClick={openCreateDialog}>
+            <PlusIcon className="mr-2 h-3 w-3" />
+            {t("kb.create")}
+          </Button>
+        )}
+      </div>
+
+      <div className="mb-6">
+        <Input
+          placeholder={t("kb.searchPlaceholder")}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-sm"
+        />
+      </div>
+
+      <div className="border border-border">
+        <div className="grid grid-cols-[2fr_3fr_120px_160px_140px] gap-4 border-b border-border bg-card px-4 py-3">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+            {t("kb.name")}
+          </div>
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+            {t("kb.description")}
+          </div>
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+            {t("kb.documentCount")}
+          </div>
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+            {t("common.createdAt")}
+          </div>
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+            {t("common.actions")}
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <span className="font-mono text-xs text-muted">{t("common.loading")}...</span>
+          </div>
+        ) : knowledgeBases.length === 0 ? (
+          <div className="flex items-center justify-center py-12">
+            <span className="font-mono text-xs text-muted">{t("common.noData")}</span>
+          </div>
+        ) : (
+          knowledgeBases.map((kb) => (
+            <div
+              key={kb.id}
+              className="grid grid-cols-[2fr_3fr_120px_160px_140px] gap-4 border-b border-border px-4 py-3 last:border-b-0 hover:bg-card/50"
+            >
+              <div className="font-mono text-sm">{kb.name}</div>
+              <div className="font-mono text-sm text-muted">
+                {kb.description || "-"}
+              </div>
+              <div className="font-mono text-sm text-muted">
+                {kb.document_count}
+              </div>
+              <div className="font-mono text-xs text-muted">
+                {new Date(kb.created_at).toLocaleDateString()}
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleViewKB(kb)}
+                  className="flex h-7 w-7 items-center justify-center text-muted hover:text-foreground"
+                  title={t("common.view")}
+                >
+                  <EyeIcon className="h-3.5 w-3.5" />
+                </button>
+                {canUpdateKB && (
+                  <button
+                    onClick={() => openEditDialog(kb)}
+                    className="flex h-7 w-7 items-center justify-center text-muted hover:text-foreground"
+                    title={t("common.edit")}
+                  >
+                    <EditIcon className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                {canDeleteKB && (
+                  <button
+                    onClick={() => openDeleteDialog(kb)}
+                    className="flex h-7 w-7 items-center justify-center text-muted hover:text-red-500"
+                    title={t("common.delete")}
+                  >
+                    <TrashIcon className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <Dialog
+        open={dialogType === "create"}
+        onClose={closeDialog}
+        title={t("kb.create")}
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeDialog}>
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={handleCreate} loading={actionLoading}>
+              {t("common.create")}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label={t("kb.name")}
+            value={formData.name}
+            onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+            required
+          />
+          <Input
+            label={t("kb.description")}
+            value={formData.description}
+            onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+          />
+          {formError && (
+            <p className="font-mono text-xs text-red-500">{formError}</p>
+          )}
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={dialogType === "edit"}
+        onClose={closeDialog}
+        title={t("kb.edit")}
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeDialog}>
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={handleUpdate} loading={actionLoading}>
+              {t("common.save")}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label={t("kb.name")}
+            value={formData.name}
+            onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+            required
+          />
+          <Input
+            label={t("kb.description")}
+            value={formData.description}
+            onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+          />
+          {formError && (
+            <p className="font-mono text-xs text-red-500">{formError}</p>
+          )}
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={dialogType === "delete"}
+        onClose={closeDialog}
+        title={t("kb.delete")}
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeDialog}>
+              {t("common.cancel")}
+            </Button>
+            <Button variant="danger" onClick={handleDelete} loading={actionLoading}>
+              {t("common.delete")}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="font-mono text-sm">{t("kb.confirmDelete")}</p>
+          <p className="font-mono text-sm text-muted">
+            {t("kb.name")}: <strong>{selectedKB?.name}</strong>
+          </p>
+          {formError && (
+            <p className="font-mono text-xs text-red-500">{formError}</p>
+          )}
+        </div>
+      </Dialog>
+    </div>
+  );
+}
+
+function PlusIcon({ className }: { readonly className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function EditIcon({ className }: { readonly className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  );
+}
+
+function TrashIcon({ className }: { readonly className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  );
+}
+
+function EyeIcon({ className }: { readonly className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
