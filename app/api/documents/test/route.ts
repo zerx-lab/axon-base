@@ -6,11 +6,19 @@ import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import type { ChatConfig } from "@/lib/supabase/types";
+import type { ChatConfig, SearchType } from "@/lib/supabase/types";
 import {
   generateSingleEmbedding,
   getEmbeddingConfig,
+  hybridSearchDocumentChunks,
 } from "@/lib/embeddings";
+import {
+  t,
+  parseLocale,
+  buildDocQASystemPrompt,
+  formatChunkContext,
+  type Locale,
+} from "@/lib/i18n-server";
 
 interface TestDocumentRequest {
   operatorId: string;
@@ -18,6 +26,7 @@ interface TestDocumentRequest {
   query: string;
   limit?: number;
   threshold?: number;
+  locale?: string;
 }
 
 interface ChunkResult {
@@ -25,6 +34,8 @@ interface ChunkResult {
   chunkIndex: number;
   content: string;
   similarity: number;
+  searchType?: SearchType;
+  combinedScore?: number;
 }
 
 function createProvider(config: ChatConfig) {
@@ -58,39 +69,26 @@ function createProvider(config: ChatConfig) {
   }
 }
 
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length) return 0;
-  
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-  
-  for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-  
-  const magnitude = Math.sqrt(normA) * Math.sqrt(normB);
-  return magnitude === 0 ? 0 : dotProduct / magnitude;
-}
-
 export async function POST(request: NextRequest) {
   try {
     const supabase = createAdminClient();
     const body: TestDocumentRequest = await request.json();
-    const { operatorId, docId, query, limit = 5, threshold = 0.5 } = body;
+    const { operatorId, docId, query, limit = 5, threshold = 0.5, locale: localeParam } = body;
+    const locale = parseLocale(localeParam);
 
     if (!operatorId || !docId || !query) {
       return NextResponse.json(
-        { error: "Missing required fields: operatorId, docId, query" },
+        { error: t("api.docTest.missingFields", locale) },
         { status: 400 }
       );
     }
 
     const canSearch = await hasPermission(supabase, operatorId, Permissions.EMBEDDING_SEARCH);
     if (!canSearch) {
-      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+      return NextResponse.json(
+        { error: t("api.docTest.permissionDenied", locale) },
+        { status: 403 }
+      );
     }
 
     const { data: doc, error: docError } = await supabase
@@ -100,12 +98,15 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (docError || !doc) {
-      return NextResponse.json({ error: "Document not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: t("api.docTest.documentNotFound", locale) },
+        { status: 404 }
+      );
     }
 
     if (doc.embedding_status !== "completed") {
       return NextResponse.json(
-        { error: "Document embedding not completed. Please embed the document first." },
+        { error: t("api.docTest.embeddingNotCompleted", locale) },
         { status: 400 }
       );
     }
@@ -113,85 +114,55 @@ export async function POST(request: NextRequest) {
     const embeddingConfig = await getEmbeddingConfig(supabase);
     const queryEmbedding = await generateSingleEmbedding(query, embeddingConfig);
 
-    const { data: allChunks, error: chunksError } = await supabase
-      .from("document_chunks")
-      .select("id, chunk_index, original_content, embedding")
-      .eq("document_id", docId)
-      .order("chunk_index");
+    const hybridResults = await hybridSearchDocumentChunks(
+      supabase,
+      query,
+      queryEmbedding,
+      docId,
+      {
+        matchCount: limit,
+        matchThreshold: threshold,
+        vectorWeight: 0.5,
+      }
+    );
 
-    if (chunksError) {
-      return NextResponse.json({ error: `Failed to fetch chunks: ${chunksError.message}` }, { status: 500 });
-    }
-
-    if (!allChunks || allChunks.length === 0) {
+    if (hybridResults.length === 0) {
       return NextResponse.json({
         success: true,
         query,
         chunks: [],
-        answer: "No content found in the document to answer your question.",
+        answer: t("api.docTest.noContentFound", locale),
         documentTitle: doc.title,
-        debug: { totalChunks: 0 },
+        debug: { totalChunks: 0, searchType: "hybrid" },
       });
     }
 
-    const parseEmbedding = (emb: unknown): number[] | null => {
-      if (Array.isArray(emb)) return emb;
-      if (typeof emb === "string") {
-        try {
-          const parsed = JSON.parse(emb);
-          if (Array.isArray(parsed)) return parsed;
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    };
-
-    const allSimilarities: Array<{ index: number; similarity: number; hasEmbedding: boolean }> = [];
-
-    const chunksWithSimilarity: ChunkResult[] = allChunks
-      .map((chunk) => {
-        const embedding = parseEmbedding(chunk.embedding);
-        const hasEmbedding = embedding !== null && embedding.length > 0;
-        const similarity = hasEmbedding ? cosineSimilarity(queryEmbedding, embedding) : 0;
-        
-        allSimilarities.push({
-          index: chunk.chunk_index,
-          similarity,
-          hasEmbedding,
-        });
-
-        return {
-          chunkId: chunk.id,
-          chunkIndex: chunk.chunk_index,
-          content: chunk.original_content,
-          similarity,
-          hasEmbedding,
-        };
-      })
-      .filter((chunk) => chunk.hasEmbedding && chunk.similarity >= threshold)
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, limit)
-      .map(({ chunkId, chunkIndex, content, similarity }) => ({
-        chunkId,
-        chunkIndex,
-        content,
-        similarity,
-      }));
+    const chunksWithSimilarity: ChunkResult[] = hybridResults.map((result) => ({
+      chunkId: result.chunk_id,
+      chunkIndex: result.chunk_index,
+      content: result.chunk_content,
+      similarity: result.similarity,
+      searchType: result.search_type,
+      combinedScore: result.combined_score,
+    }));
 
     const debug = {
-      totalChunks: allChunks.length,
-      chunksWithEmbedding: allSimilarities.filter(s => s.hasEmbedding).length,
+      totalChunks: hybridResults.length,
+      searchType: "hybrid",
       queryEmbeddingLength: queryEmbedding.length,
       threshold,
-      similarities: allSimilarities.slice(0, 10),
+      resultTypes: hybridResults.reduce((acc, r) => {
+        acc[r.search_type] = (acc[r.search_type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
     };
 
-    return await generateAnswer(supabase, query, chunksWithSimilarity, doc.title, debug);
+    return await generateAnswer(supabase, query, chunksWithSimilarity, doc.title, locale, debug);
   } catch (error) {
     console.error("Document test error:", error);
+    const locale = parseLocale(undefined);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Test failed" },
+      { error: error instanceof Error ? error.message : t("api.docTest.testFailed", locale) },
       { status: 500 }
     );
   }
@@ -202,6 +173,7 @@ async function generateAnswer(
   query: string,
   chunks: ChunkResult[],
   documentTitle: string,
+  locale: Locale,
   debug?: unknown
 ) {
   if (chunks.length === 0) {
@@ -209,7 +181,7 @@ async function generateAnswer(
       success: true,
       query,
       chunks: [],
-      answer: "No relevant content found in the document to answer your question.",
+      answer: t("api.docTest.noRelevantContent", locale),
       documentTitle,
       debug,
     });
@@ -226,7 +198,7 @@ async function generateAnswer(
       success: true,
       query,
       chunks,
-      answer: "Chat model not configured. Please configure it in Settings.",
+      answer: t("api.docTest.chatNotConfigured", locale),
       documentTitle,
     });
   }
@@ -238,30 +210,13 @@ async function generateAnswer(
       success: true,
       query,
       chunks,
-      answer: "Chat API key not configured. Please configure it in Settings.",
+      answer: t("api.docTest.apiKeyNotConfigured", locale),
       documentTitle,
     });
   }
 
-  const context = chunks
-    .map((chunk, index) => `[Fragment ${index + 1}] (Similarity: ${(chunk.similarity * 100).toFixed(1)}%)\n${chunk.content}`)
-    .join("\n\n---\n\n");
-
-  const systemPrompt = `You are a document Q&A assistant. You MUST answer the user's question based ONLY on the provided document fragments below.
-
-STRICT RULES:
-1. You can ONLY use information from the provided fragments to answer
-2. If the fragments don't contain enough information to answer the question, say "Based on the provided document content, I cannot find relevant information to answer this question."
-3. Do NOT make up or infer information that is not explicitly stated in the fragments
-4. Always cite which fragment(s) your answer is based on when possible
-5. Keep your answer concise and accurate
-
-Document: "${documentTitle}"
-
----
-DOCUMENT FRAGMENTS:
-${context}
----`;
+  const context = formatChunkContext(chunks, locale);
+  const systemPrompt = buildDocQASystemPrompt(documentTitle, context, locale);
 
   try {
     const model = createProvider(chatConfig);
@@ -296,7 +251,7 @@ ${context}
       success: true,
       query,
       chunks,
-      answer: `Failed to generate answer: ${error instanceof Error ? error.message : "Unknown error"}`,
+      answer: `${t("api.docTest.generateFailed", locale)}: ${error instanceof Error ? error.message : "Unknown error"}`,
       documentTitle,
     });
   }

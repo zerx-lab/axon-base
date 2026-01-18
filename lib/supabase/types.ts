@@ -414,6 +414,84 @@ export interface SimilarChunk {
   similarity: number;
 }
 
+export type SearchType = "vector" | "bm25" | "hybrid";
+
+export interface HybridSearchChunk {
+  chunk_id: string;
+  document_id: string;
+  document_title: string;
+  chunk_content: string;
+  chunk_context: string | null;
+  chunk_index: number;
+  similarity: number;
+  bm25_rank: number | null;
+  vector_rank: number | null;
+  combined_score: number;
+  search_type: SearchType;
+}
+
+export interface HybridSearchOptions {
+  searchType?: SearchType;
+  matchCount?: number;
+  matchThreshold?: number;
+  vectorWeight?: number;
+  rrfK?: number;
+}
+
+export interface HybridSearchChunkWithTokens extends HybridSearchChunk {
+  token_count: number;
+}
+
+export type RerankerProvider = "cohere" | "jina" | "voyage" | "local-bge" | "none";
+
+export interface RerankerConfig {
+  provider: RerankerProvider;
+  apiKey: string;
+  model?: string;
+  baseUrl?: string;
+  enabled: boolean;
+}
+
+export interface SearchStats {
+  vectorOnly: number;
+  bm25Only: number;
+  hybrid: number;
+  total: number;
+}
+
+export interface SearchIndexStats {
+  total_chunks: number;
+  chunks_with_embedding: number;
+  chunks_with_search_vector: number;
+  avg_chunk_tokens: number;
+  total_documents: number;
+  index_coverage_percent: number;
+}
+
+export interface DocumentChunkSearchResult {
+  chunk_id: string;
+  document_id: string;
+  chunk_content: string;
+  chunk_context: string | null;
+  chunk_index: number;
+  similarity: number;
+  bm25_rank: number | null;
+  vector_rank: number | null;
+  combined_score: number;
+  search_type: SearchType;
+}
+
+/** Raw result from bm25_search_chunks RPC function */
+export interface BM25SearchRawResult {
+  chunk_id: string;
+  document_id: string;
+  document_title: string;
+  chunk_content: string;
+  chunk_context: string | null;
+  chunk_index: number;
+  bm25_score: number;
+}
+
 export interface ContextConfig {
   enabled: boolean;
   maxDocumentTokens: number;

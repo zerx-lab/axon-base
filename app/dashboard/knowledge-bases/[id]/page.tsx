@@ -48,7 +48,7 @@ interface TestResult {
 }
 
 export default function DocumentsPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { user: authUser, isLoading: authLoading, hasPermission } = useAuth();
   const router = useRouter();
   const params = useParams();
@@ -273,6 +273,7 @@ export default function DocumentsPage() {
           query: testQuery.trim(),
           limit: 5,
           threshold: 0.5,
+          locale,
         }),
       });
 

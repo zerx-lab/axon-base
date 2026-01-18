@@ -6,11 +6,19 @@ import { streamText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import type { ChatConfig } from "@/lib/supabase/types";
+import type { ChatConfig, SearchType } from "@/lib/supabase/types";
 import {
   generateSingleEmbedding,
   getEmbeddingConfig,
+  hybridSearchDocumentChunks,
 } from "@/lib/embeddings";
+import {
+  t,
+  parseLocale,
+  buildDocQASystemPrompt,
+  formatChunkContext,
+  type Locale,
+} from "@/lib/i18n-server";
 
 interface TestDocumentRequest {
   operatorId: string;
@@ -18,6 +26,7 @@ interface TestDocumentRequest {
   query: string;
   limit?: number;
   threshold?: number;
+  locale?: string;
 }
 
 interface ChunkResult {
@@ -25,6 +34,8 @@ interface ChunkResult {
   chunkIndex: number;
   content: string;
   similarity: number;
+  searchType?: SearchType;
+  combinedScore?: number;
 }
 
 function createChatProvider(config: ChatConfig) {
@@ -58,32 +69,18 @@ function createChatProvider(config: ChatConfig) {
   }
 }
 
-function calculateCosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length) return 0;
-  
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-  
-  for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-  
-  const magnitude = Math.sqrt(normA) * Math.sqrt(normB);
-  return magnitude === 0 ? 0 : dotProduct / magnitude;
-}
-
 export async function POST(request: NextRequest) {
+  let locale: Locale = "zh";
+  
   try {
     const supabase = createAdminClient();
     const body: TestDocumentRequest = await request.json();
-    const { operatorId, docId, query, limit = 5, threshold = 0.5 } = body;
+    const { operatorId, docId, query, limit = 5, threshold = 0.5, locale: localeParam } = body;
+    locale = parseLocale(localeParam);
 
     if (!operatorId || !docId || !query) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: operatorId, docId, query" }),
+        JSON.stringify({ error: t("api.docTest.missingFields", locale) }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
@@ -91,7 +88,7 @@ export async function POST(request: NextRequest) {
     const canSearch = await hasPermission(supabase, operatorId, Permissions.EMBEDDING_SEARCH);
     if (!canSearch) {
       return new Response(
-        JSON.stringify({ error: "Permission denied" }),
+        JSON.stringify({ error: t("api.docTest.permissionDenied", locale) }),
         { status: 403, headers: { "Content-Type": "application/json" } }
       );
     }
@@ -104,14 +101,14 @@ export async function POST(request: NextRequest) {
 
     if (docError || !doc) {
       return new Response(
-        JSON.stringify({ error: "Document not found" }),
+        JSON.stringify({ error: t("api.docTest.documentNotFound", locale) }),
         { status: 404, headers: { "Content-Type": "application/json" } }
       );
     }
 
     if (doc.embedding_status !== "completed") {
       return new Response(
-        JSON.stringify({ error: "Document embedding not completed. Please embed the document first." }),
+        JSON.stringify({ error: t("api.docTest.embeddingNotCompleted", locale) }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
@@ -119,75 +116,51 @@ export async function POST(request: NextRequest) {
     const embeddingConfig = await getEmbeddingConfig(supabase);
     const queryEmbedding = await generateSingleEmbedding(query, embeddingConfig);
 
-    const { data: allChunks, error: chunksError } = await supabase
-      .from("document_chunks")
-      .select("id, chunk_index, original_content, embedding")
-      .eq("document_id", docId)
-      .order("chunk_index");
+    const hybridResults = await hybridSearchDocumentChunks(
+      supabase,
+      query,
+      queryEmbedding,
+      docId,
+      {
+        matchCount: limit,
+        matchThreshold: threshold,
+        vectorWeight: 0.5,
+      }
+    );
 
-    if (chunksError) {
-      return new Response(
-        JSON.stringify({ error: `Failed to fetch chunks: ${chunksError.message}` }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
-    }
-
-    if (!allChunks || allChunks.length === 0) {
+    if (hybridResults.length === 0) {
       return new Response(
         JSON.stringify({
           type: "complete",
           success: true,
           query,
           chunks: [],
-          answer: "No content found in the document to answer your question.",
+          answer: t("api.docTest.noContentFound", locale),
           documentTitle: doc.title,
         }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    const parseEmbedding = (emb: unknown): number[] | null => {
-      if (Array.isArray(emb)) return emb;
-      if (typeof emb === "string") {
-        try {
-          const parsed = JSON.parse(emb);
-          if (Array.isArray(parsed)) return parsed;
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    };
+    const chunksWithSimilarity: ChunkResult[] = hybridResults.map((result) => ({
+      chunkId: result.chunk_id,
+      chunkIndex: result.chunk_index,
+      content: result.chunk_content,
+      similarity: result.similarity,
+      searchType: result.search_type,
+      combinedScore: result.combined_score,
+    }));
 
-    const chunksWithSimilarity: ChunkResult[] = allChunks
-      .map((chunk) => {
-        const embedding = parseEmbedding(chunk.embedding);
-        const hasEmbedding = embedding !== null && embedding.length > 0;
-        const similarity = hasEmbedding ? calculateCosineSimilarity(queryEmbedding, embedding) : 0;
-
-        return {
-          chunkId: chunk.id,
-          chunkIndex: chunk.chunk_index,
-          content: chunk.original_content,
-          similarity,
-          hasEmbedding,
-        };
-      })
-      .filter((chunk) => chunk.hasEmbedding && chunk.similarity >= threshold)
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, limit)
-      .map(({ chunkId, chunkIndex, content, similarity }) => ({
-        chunkId,
-        chunkIndex,
-        content,
-        similarity,
-      }));
-
-    return streamAnswer(supabase, query, chunksWithSimilarity, doc.title);
+    return streamAnswer(supabase, query, chunksWithSimilarity, doc.title, locale);
   } catch (error) {
     console.error("Document test stream error:", error);
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : typeof error === "object" && error !== null
+        ? JSON.stringify(error)
+        : t("api.docTest.testFailed", locale);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Test failed" }),
+      JSON.stringify({ error: errorMessage, details: String(error) }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
@@ -197,7 +170,8 @@ async function streamAnswer(
   supabase: ReturnType<typeof createAdminClient>,
   query: string,
   chunks: ChunkResult[],
-  documentTitle: string
+  documentTitle: string,
+  locale: Locale
 ): Promise<Response> {
   const encoder = new TextEncoder();
   const startTime = Date.now();
@@ -220,7 +194,7 @@ async function streamAnswer(
       });
 
       if (chunks.length === 0) {
-        await sendEvent("text", { content: "No relevant content found in the document to answer your question." });
+        await sendEvent("text", { content: t("api.docTest.noRelevantContent", locale) });
         await sendEvent("done", { 
           responseTime: Date.now() - startTime,
           usage: null,
@@ -236,7 +210,7 @@ async function streamAnswer(
         .single();
 
       if (!chatConfigData?.value) {
-        await sendEvent("text", { content: "Chat model not configured. Please configure it in Settings." });
+        await sendEvent("text", { content: t("api.docTest.chatNotConfigured", locale) });
         await sendEvent("done", { responseTime: Date.now() - startTime, usage: null });
         await writer.close();
         return;
@@ -245,30 +219,14 @@ async function streamAnswer(
       const chatConfig = chatConfigData.value as unknown as ChatConfig;
 
       if (!chatConfig.apiKey || chatConfig.apiKey === "********") {
-        await sendEvent("text", { content: "Chat API key not configured. Please configure it in Settings." });
+        await sendEvent("text", { content: t("api.docTest.apiKeyNotConfigured", locale) });
         await sendEvent("done", { responseTime: Date.now() - startTime, usage: null });
         await writer.close();
         return;
       }
-      const context = chunks
-        .map((chunk, index) => `[Fragment ${index + 1}] (Similarity: ${(chunk.similarity * 100).toFixed(1)}%)\n${chunk.content}`)
-        .join("\n\n---\n\n");
 
-      const systemPrompt = `You are a document Q&A assistant. You MUST answer the user's question based ONLY on the provided document fragments below.
-
-STRICT RULES:
-1. You can ONLY use information from the provided fragments to answer
-2. If the fragments don't contain enough information to answer the question, say "Based on the provided document content, I cannot find relevant information to answer this question."
-3. Do NOT make up or infer information that is not explicitly stated in the fragments
-4. Always cite which fragment(s) your answer is based on when possible
-5. Keep your answer concise and accurate
-
-Document: "${documentTitle}"
-
----
-DOCUMENT FRAGMENTS:
-${context}
----`;
+      const context = formatChunkContext(chunks, locale);
+      const systemPrompt = buildDocQASystemPrompt(documentTitle, context, locale);
 
       try {
         const model = createChatProvider(chatConfig);
@@ -298,13 +256,13 @@ ${context}
       } catch (error) {
         console.error("Stream generation error:", error);
         await sendEvent("error", {
-          message: `Failed to generate answer: ${error instanceof Error ? error.message : "Unknown error"}`,
+          message: `${t("api.docTest.generateFailed", locale)}: ${error instanceof Error ? error.message : "Unknown error"}`,
         });
       }
     } catch (error) {
       console.error("Stream processing error:", error);
       await sendEvent("error", {
-        message: error instanceof Error ? error.message : "Stream processing failed",
+        message: error instanceof Error ? error.message : t("api.docTest.streamFailed", locale),
       });
     } finally {
       await writer.close();

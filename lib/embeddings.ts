@@ -1,5 +1,17 @@
 import OpenAI from "openai";
-import type { EmbeddingConfig, SimilarChunk, KnowledgeBaseSettings, ChatConfig } from "@/lib/supabase/types";
+import type { 
+  EmbeddingConfig, 
+  SimilarChunk, 
+  KnowledgeBaseSettings, 
+  ChatConfig,
+  HybridSearchChunk,
+  HybridSearchChunkWithTokens,
+  HybridSearchOptions,
+  SearchType,
+  SearchIndexStats,
+  DocumentChunkSearchResult,
+  BM25SearchRawResult,
+} from "@/lib/supabase/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { RecursiveCharacterSplitter, computeContentHash } from "@/lib/chunking";
 import { ContextGenerator } from "@/lib/chunking";
@@ -208,6 +220,134 @@ export async function searchSimilarChunks(
 
   if (error) throw error;
   return data || [];
+}
+
+export async function hybridSearchChunks(
+  supabase: SupabaseClient,
+  queryText: string,
+  queryEmbedding: number[],
+  kbId: string,
+  options: HybridSearchOptions = {}
+): Promise<HybridSearchChunk[]> {
+  const {
+    searchType = "hybrid",
+    matchCount = 20,
+    matchThreshold = 0.3,
+    vectorWeight = 0.5,
+    rrfK = 60,
+  } = options;
+
+  if (searchType === "vector") {
+    const results = await searchSimilarChunks(
+      supabase,
+      queryEmbedding,
+      kbId,
+      matchCount,
+      matchThreshold
+    );
+    return results.map((r) => ({
+      chunk_id: r.chunk_id,
+      document_id: r.document_id,
+      document_title: r.document_title,
+      chunk_content: r.chunk_content,
+      chunk_context: r.chunk_context ?? null,
+      chunk_index: r.chunk_index,
+      similarity: r.similarity,
+      bm25_rank: null,
+      vector_rank: null,
+      combined_score: r.similarity,
+      search_type: "vector" as SearchType,
+    }));
+  }
+
+  if (searchType === "bm25") {
+    const { data, error } = await supabase.rpc("bm25_search_chunks", {
+      query_text: queryText,
+      target_kb_id: kbId,
+      match_count: matchCount,
+    });
+    if (error) throw error;
+    return (data || []).map((r: BM25SearchRawResult, index: number) => ({
+      chunk_id: r.chunk_id,
+      document_id: r.document_id,
+      document_title: r.document_title,
+      chunk_content: r.chunk_content,
+      chunk_context: r.chunk_context,
+      chunk_index: r.chunk_index,
+      similarity: 0,
+      bm25_rank: index + 1,
+      vector_rank: null,
+      combined_score: r.bm25_score,
+      search_type: "bm25" as SearchType,
+    }));
+  }
+
+  const { data, error } = await supabase.rpc("hybrid_search_chunks", {
+    query_text: queryText,
+    query_embedding: queryEmbedding,
+    target_kb_id: kbId,
+    match_count: matchCount,
+    match_threshold: matchThreshold,
+    vector_weight: vectorWeight,
+    rrf_k: rrfK,
+  });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function hybridSearchForReranking(
+  supabase: SupabaseClient,
+  queryText: string,
+  queryEmbedding: number[],
+  kbId: string,
+  candidateCount: number = 100,
+  matchThreshold: number = 0.2,
+  vectorWeight: number = 0.5
+): Promise<HybridSearchChunkWithTokens[]> {
+  const { data, error } = await supabase.rpc("hybrid_search_for_reranking", {
+    query_text: queryText,
+    query_embedding: queryEmbedding,
+    target_kb_id: kbId,
+    candidate_count: candidateCount,
+    match_threshold: matchThreshold,
+    vector_weight: vectorWeight,
+    rrf_k: 60,
+  });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getSearchStats(
+  supabase: SupabaseClient,
+  kbId: string
+): Promise<SearchIndexStats> {
+  const { data, error } = await supabase.rpc("get_search_stats", {
+    target_kb_id: kbId,
+  });
+
+  if (error) throw error;
+  return data?.[0] || {
+    total_chunks: 0,
+    chunks_with_embedding: 0,
+    chunks_with_search_vector: 0,
+    avg_chunk_tokens: 0,
+    total_documents: 0,
+    index_coverage_percent: 0,
+  };
+}
+
+export async function rebuildSearchVectors(
+  supabase: SupabaseClient,
+  kbId: string
+): Promise<{ updated_count: number; duration_ms: number }> {
+  const { data, error } = await supabase.rpc("rebuild_search_vectors", {
+    target_kb_id: kbId,
+  });
+
+  if (error) throw error;
+  return data?.[0] || { updated_count: 0, duration_ms: 0 };
 }
 
 export async function getEmbeddingStats(
@@ -483,4 +623,42 @@ export async function deleteKnowledgeBaseEmbeddings(
       error: extractErrorMessage(error),
     };
   }
+}
+
+export interface DocumentHybridSearchOptions {
+  matchCount?: number;
+  matchThreshold?: number;
+  vectorWeight?: number;
+  rrfK?: number;
+}
+
+export async function hybridSearchDocumentChunks(
+  supabase: SupabaseClient,
+  queryText: string,
+  queryEmbedding: number[],
+  documentId: string,
+  options: DocumentHybridSearchOptions = {}
+): Promise<DocumentChunkSearchResult[]> {
+  const {
+    matchCount = 10,
+    matchThreshold = 0.3,
+    vectorWeight = 0.5,
+    rrfK = 60,
+  } = options;
+
+  const { data, error } = await supabase.rpc("hybrid_search_document_chunks", {
+    query_text: queryText,
+    query_embedding: queryEmbedding,
+    target_document_id: documentId,
+    match_count: matchCount,
+    match_threshold: matchThreshold,
+    vector_weight: vectorWeight,
+    rrf_k: rrfK,
+  });
+
+  if (error) {
+    console.error("hybridSearchDocumentChunks error:", error);
+    throw new Error(`Hybrid search failed: ${error.message || JSON.stringify(error)}`);
+  }
+  return data || [];
 }

@@ -401,12 +401,32 @@ const translations: Translations = {
   "embedding.chunkOverlap": { zh: "分块重叠", en: "Chunk Overlap" },
   "embedding.tokens": { zh: "tokens", en: "tokens" },
 
-  // Semantic Search
+  // Search
   "search.semantic": { zh: "语义搜索", en: "Semantic Search" },
+  "search.keyword": { zh: "关键词搜索", en: "Keyword Search" },
+  "search.hybrid": { zh: "混合搜索", en: "Hybrid Search" },
+  "search.hybridDesc": { zh: "结合语义和关键词搜索，提升 49% 检索准确率", en: "Combines semantic and keyword search, improving retrieval accuracy by 49%" },
   "search.placeholder": { zh: "输入搜索内容...", en: "Enter search query..." },
   "search.noResults": { zh: "未找到相关结果", en: "No results found" },
   "search.similarity": { zh: "相似度", en: "Similarity" },
+  "search.combinedScore": { zh: "综合得分", en: "Combined Score" },
   "search.matchedChunks": { zh: "匹配片段", en: "Matched Chunks" },
+  "search.vectorWeight": { zh: "语义权重", en: "Semantic Weight" },
+  "search.vectorWeightDesc": { zh: "语义搜索在混合搜索中的权重 (0-1)", en: "Weight of semantic search in hybrid mode (0-1)" },
+  "search.matchType": { zh: "匹配类型", en: "Match Type" },
+  "search.matchTypeVector": { zh: "语义匹配", en: "Semantic Match" },
+  "search.matchTypeBm25": { zh: "关键词匹配", en: "Keyword Match" },
+  "search.matchTypeHybrid": { zh: "双重匹配", en: "Both Matched" },
+  "search.reranking": { zh: "重排序", en: "Reranking" },
+  "search.rerankingDesc": { zh: "使用 AI 模型对检索结果进行精排，进一步提升 18% 准确率", en: "Use AI model to rerank results, improving accuracy by another 18%" },
+  "search.rerankingEnabled": { zh: "已启用重排序", en: "Reranking Enabled" },
+  "search.rerankerProvider": { zh: "重排序服务", en: "Reranker Provider" },
+  "search.rerankerCohere": { zh: "Cohere Rerank", en: "Cohere Rerank" },
+  "search.rerankerJina": { zh: "Jina Reranker", en: "Jina Reranker" },
+  "search.rerankerVoyage": { zh: "Voyage Rerank", en: "Voyage Rerank" },
+  "search.indexStats": { zh: "索引统计", en: "Index Stats" },
+  "search.indexCoverage": { zh: "索引覆盖率", en: "Index Coverage" },
+  "search.rebuildIndex": { zh: "重建索引", en: "Rebuild Index" },
 
   // Permission names (Embedding)
   "permission.category.embedding": { zh: "向量化管理", en: "Embedding Management" },
