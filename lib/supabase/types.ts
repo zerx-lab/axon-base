@@ -477,6 +477,91 @@ export interface Database {
           }
         ];
       };
+      chat_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string | null;
+          kb_ids: string[];
+          settings: Json;
+          status: ChatSessionStatus;
+          message_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title?: string | null;
+          kb_ids?: string[];
+          settings?: Json;
+          status?: ChatSessionStatus;
+          message_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          title?: string | null;
+          kb_ids?: string[];
+          settings?: Json;
+          status?: ChatSessionStatus;
+          message_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "chat_sessions_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      chat_messages: {
+        Row: {
+          id: string;
+          session_id: string;
+          role: ChatMessageRole;
+          content: string;
+          status: ChatMessageStatus;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          role: ChatMessageRole;
+          content?: string;
+          status?: ChatMessageStatus;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string;
+          role?: ChatMessageRole;
+          content?: string;
+          status?: ChatMessageStatus;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_session_id_fkey";
+            columns: ["session_id"];
+            isOneToOne: false;
+            referencedRelation: "chat_sessions";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -493,6 +578,10 @@ export interface Database {
   };
 }
 
+export type ChatSessionStatus = "active" | "archived";
+export type ChatMessageRole = "user" | "assistant" | "system";
+export type ChatMessageStatus = "pending" | "streaming" | "completed" | "failed";
+
 export type Role = Database["public"]["Tables"]["roles"]["Row"];
 export type User = Database["public"]["Tables"]["users"]["Row"];
 export type Session = Database["public"]["Tables"]["sessions"]["Row"];
@@ -501,6 +590,8 @@ export type Document = Database["public"]["Tables"]["documents"]["Row"];
 
 export type SafeUser = Omit<User, "password_hash">;
 export type DocumentChunk = Database["public"]["Tables"]["document_chunks"]["Row"];
+export type ChatSession = Database["public"]["Tables"]["chat_sessions"]["Row"];
+export type ChatMessage = Database["public"]["Tables"]["chat_messages"]["Row"];
 
 export interface UserWithRole extends SafeUser {
   role: Role;
@@ -615,6 +706,7 @@ export interface SimilarChunk {
   chunk_id: string;
   document_id: string;
   document_title: string;
+  document_source_url: string | null;
   chunk_content: string;
   chunk_context?: string;
   chunk_index: number;
@@ -627,6 +719,7 @@ export interface HybridSearchChunk {
   chunk_id: string;
   document_id: string;
   document_title: string;
+  document_source_url: string | null;
   chunk_content: string;
   chunk_context: string | null;
   chunk_index: number;
@@ -635,6 +728,7 @@ export interface HybridSearchChunk {
   vector_rank: number | null;
   combined_score: number;
   search_type: SearchType;
+  kb_id?: string;
 }
 
 export interface HybridSearchOptions {
@@ -736,4 +830,76 @@ export interface DocumentChunkExtended {
   embedding: number[] | null;
   context_hash: string | null;
   created_at: string;
+}
+
+export interface ChatSessionWithMessages extends ChatSession {
+  messages?: ChatMessage[];
+}
+
+export interface ChatMessageMetadata {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  model?: string;
+  finishReason?: string;
+  references?: Array<{
+    chunkId: string;
+    documentId: string;
+    documentTitle: string;
+    sourceUrl: string | null;
+    contextSummary?: string | null;
+    content: string;
+    similarity: number;
+    chunkIndex?: number;
+  }>;
+  error?: string;
+}
+
+export interface ChatSessionSettings {
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  systemPrompt?: string;
+}
+
+export interface PromptConfig {
+  chatWithContext: string;
+  chatNoContext: string;
+  docQA: string;
+}
+
+export const DEFAULT_PROMPTS: PromptConfig = {
+  chatWithContext: `You are a knowledge base assistant. Answer questions based on the provided context from the knowledge base. If the context doesn't contain relevant information, you can briefly explain what you found and suggest rephrasing the question.
+
+{{customPrompt}}
+
+RULES:
+1. Prioritize information from the provided context
+2. If context is insufficient, acknowledge it honestly
+3. You may cite sources using [number] format
+4. For greetings or general questions about your capabilities, respond naturally
+
+Context from knowledge base:
+{{context}}`,
+  chatNoContext: `You are a knowledge base assistant. The search returned no relevant results for this query.
+
+Please respond helpfully:
+- For greetings, introduce yourself as a knowledge base assistant
+- For questions, suggest the user rephrase their query or check if the knowledge base contains relevant documents
+- Be polite and helpful`,
+  docQA: `You are a document Q&A assistant. Answer the user's question based ONLY on the provided document fragments below.
+
+STRICT RULES:
+1. You can ONLY use information from the provided fragments to answer
+2. If the fragments don't contain enough information, say "Based on the provided document content, I cannot find relevant information to answer this question."
+3. Do NOT make up or infer information that is not explicitly stated in the fragments
+4. Cite which fragment(s) your answer is based on when possible
+5. Keep your answer concise and accurate
+
+Document: "{{documentTitle}}"
+
+---
+DOCUMENT FRAGMENTS:
+{{context}}
+---`,
 }

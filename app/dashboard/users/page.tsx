@@ -125,7 +125,7 @@ export default function UsersPage() {
       <div className="flex h-full items-center justify-center p-8">
         <div className="text-center">
           <h2 className="font-mono text-lg font-medium text-red-500">{t("error.accessDenied")}</h2>
-          <p className="mt-2 font-mono text-sm text-muted">{t("error.noPermission")}</p>
+          <p className="mt-2 font-mono text-sm text-muted-foreground">{t("error.noPermission")}</p>
         </div>
       </div>
     );
@@ -338,7 +338,7 @@ export default function UsersPage() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="font-mono text-xl font-medium">{t("users.title")}</h1>
-          <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted">
+          <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {users.length} {t("common.user").toLowerCase()}(s)
           </p>
         </div>
@@ -364,19 +364,19 @@ export default function UsersPage() {
       <div className="border border-border">
         {/* Table Header */}
         <div className="grid grid-cols-[1fr_1fr_150px_100px_140px] gap-4 border-b border-border bg-card px-4 py-3">
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("users.username")}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("users.displayName")}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("users.role")}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("common.status")}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("common.actions")}
           </div>
         </div>
@@ -384,11 +384,11 @@ export default function UsersPage() {
         {/* Table Body */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <span className="font-mono text-xs text-muted">{t("common.loading")}...</span>
+            <span className="font-mono text-xs text-muted-foreground">{t("common.loading")}...</span>
           </div>
         ) : users.length === 0 ? (
           <div className="flex items-center justify-center py-12">
-            <span className="font-mono text-xs text-muted">{t("common.noData")}</span>
+            <span className="font-mono text-xs text-muted-foreground">{t("common.noData")}</span>
           </div>
         ) : (
           users.map((user) => (
@@ -397,7 +397,7 @@ export default function UsersPage() {
               className="grid grid-cols-[1fr_1fr_150px_100px_140px] gap-4 border-b border-border px-4 py-3 last:border-b-0 hover:bg-card/50"
             >
               <div className="font-mono text-sm">{user.username}</div>
-              <div className="font-mono text-sm text-muted">
+              <div className="font-mono text-sm text-muted-foreground">
                 {user.display_name || "-"}
               </div>
               <div>
@@ -439,7 +439,7 @@ export default function UsersPage() {
                 {canUpdateUser && (
                   <button
                     onClick={() => openEditDialog(user)}
-                    className="flex h-7 w-7 items-center justify-center text-muted hover:text-foreground"
+                    className="flex h-7 w-7 items-center justify-center text-muted-foreground hover:text-foreground"
                     title={t("common.edit")}
                   >
                     <EditIcon className="h-3.5 w-3.5" />
@@ -448,7 +448,7 @@ export default function UsersPage() {
                 {canResetPassword && (
                   <button
                     onClick={() => openResetPasswordDialog(user)}
-                    className="flex h-7 w-7 items-center justify-center text-muted hover:text-foreground"
+                    className="flex h-7 w-7 items-center justify-center text-muted-foreground hover:text-foreground"
                     title={t("users.resetPassword")}
                   >
                     <KeyIcon className="h-3.5 w-3.5" />
@@ -457,7 +457,7 @@ export default function UsersPage() {
                 {canDeleteUser && (
                   <button
                     onClick={() => openDeleteDialog(user)}
-                    className="flex h-7 w-7 items-center justify-center text-muted hover:text-red-500"
+                    className="flex h-7 w-7 items-center justify-center text-muted-foreground hover:text-red-500"
                     title={t("common.delete")}
                   >
                     <TrashIcon className="h-3.5 w-3.5" />
@@ -572,7 +572,7 @@ export default function UsersPage() {
         }
       >
         <div className="space-y-4">
-          <p className="font-mono text-sm text-muted">
+          <p className="font-mono text-sm text-muted-foreground">
             {t("users.resetPassword")}: <strong>{selectedUser?.username}</strong>
           </p>
           <Input
@@ -606,7 +606,7 @@ export default function UsersPage() {
       >
         <div className="space-y-4">
           <p className="font-mono text-sm">{t("users.confirmDelete")}</p>
-          <p className="font-mono text-sm text-muted">
+          <p className="font-mono text-sm text-muted-foreground">
             {t("users.username")}: <strong>{selectedUser?.username}</strong>
           </p>
           {formError && (

@@ -146,7 +146,7 @@ export default function KnowledgeBasesPage() {
       <div className="flex h-full items-center justify-center p-8">
         <div className="text-center">
           <h2 className="font-mono text-lg font-medium text-red-500">{t("error.accessDenied")}</h2>
-          <p className="mt-2 font-mono text-sm text-muted">{t("error.noPermission")}</p>
+          <p className="mt-2 font-mono text-sm text-muted-foreground">{t("error.noPermission")}</p>
         </div>
       </div>
     );
@@ -317,7 +317,7 @@ export default function KnowledgeBasesPage() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="font-mono text-xl font-medium">{t("kb.title")}</h1>
-          <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted">
+          <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {knowledgeBases.length} {t("kb.knowledgeBase").toLowerCase()}(s)
           </p>
         </div>
@@ -350,33 +350,33 @@ export default function KnowledgeBasesPage() {
 
       <div className="border border-border">
         <div className="grid grid-cols-[2fr_3fr_120px_120px_160px_180px] gap-4 border-b border-border bg-card px-4 py-3">
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("kb.name")}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("kb.description")}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("kb.documentCount")}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("embedding.status")}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("common.createdAt")}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("common.actions")}
           </div>
         </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <span className="font-mono text-xs text-muted">{t("common.loading")}...</span>
+            <span className="font-mono text-xs text-muted-foreground">{t("common.loading")}...</span>
           </div>
         ) : knowledgeBases.length === 0 ? (
           <div className="flex items-center justify-center py-12">
-            <span className="font-mono text-xs text-muted">{t("common.noData")}</span>
+            <span className="font-mono text-xs text-muted-foreground">{t("common.noData")}</span>
           </div>
         ) : (
           knowledgeBases.map((kb) => {
@@ -389,13 +389,13 @@ export default function KnowledgeBasesPage() {
                 className="grid grid-cols-[2fr_3fr_120px_120px_160px_180px] gap-4 border-b border-border px-4 py-3 last:border-b-0 hover:bg-card/50"
               >
                 <div className="font-mono text-sm">{kb.name}</div>
-                <div className="font-mono text-sm text-muted">
+                <div className="font-mono text-sm text-muted-foreground">
                   {kb.description || "-"}
                 </div>
-                <div className="font-mono text-sm text-muted">
+                <div className="font-mono text-sm text-muted-foreground">
                   {kb.document_count}
                 </div>
-                <div className="font-mono text-xs text-muted">
+                <div className="font-mono text-xs text-muted-foreground">
                   {stats ? (
                     <span className={stats.embedded === stats.total && stats.total > 0 ? "text-green-600" : ""}>
                       {stats.embedded}/{stats.total} {t("embedding.embeddedDocs").toLowerCase()}
@@ -404,13 +404,13 @@ export default function KnowledgeBasesPage() {
                     "-"
                   )}
                 </div>
-                <div className="font-mono text-xs text-muted">
+                <div className="font-mono text-xs text-muted-foreground">
                   {new Date(kb.created_at).toLocaleDateString()}
                 </div>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => handleViewKB(kb)}
-                    className="flex h-7 w-7 items-center justify-center text-muted hover:text-foreground"
+                    className="flex h-7 w-7 items-center justify-center text-muted-foreground hover:text-foreground"
                     title={t("common.view")}
                   >
                     <EyeIcon className="h-3.5 w-3.5" />
@@ -419,7 +419,7 @@ export default function KnowledgeBasesPage() {
                     <button
                       onClick={() => handleEmbedAll(kb.id)}
                       disabled={isEmbedding}
-                      className="flex h-7 w-7 items-center justify-center text-muted hover:text-foreground disabled:opacity-50"
+                      className="flex h-7 w-7 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-50"
                       title={t("embedding.embedAll")}
                     >
                       {isEmbedding ? (
@@ -432,7 +432,7 @@ export default function KnowledgeBasesPage() {
                   {canUpdateKB && (
                     <button
                       onClick={() => openEditDialog(kb)}
-                      className="flex h-7 w-7 items-center justify-center text-muted hover:text-foreground"
+                      className="flex h-7 w-7 items-center justify-center text-muted-foreground hover:text-foreground"
                       title={t("common.edit")}
                     >
                       <EditIcon className="h-3.5 w-3.5" />
@@ -441,7 +441,7 @@ export default function KnowledgeBasesPage() {
                   {canDeleteKB && (
                     <button
                       onClick={() => openDeleteDialog(kb)}
-                      className="flex h-7 w-7 items-center justify-center text-muted hover:text-red-500"
+                      className="flex h-7 w-7 items-center justify-center text-muted-foreground hover:text-red-500"
                       title={t("common.delete")}
                     >
                       <TrashIcon className="h-3.5 w-3.5" />
@@ -537,7 +537,7 @@ export default function KnowledgeBasesPage() {
       >
         <div className="space-y-4">
           <p className="font-mono text-sm">{t("kb.confirmDelete")}</p>
-          <p className="font-mono text-sm text-muted">
+          <p className="font-mono text-sm text-muted-foreground">
             {t("kb.name")}: <strong>{selectedKB?.name}</strong>
           </p>
           {formError && (

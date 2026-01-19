@@ -64,7 +64,7 @@ export default function TasksPage() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="font-mono text-xl font-medium">{t("task.title")}</h1>
-          <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted">
+          <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {pendingCount} {t("task.status.pending").toLowerCase()} · {runningCount} {t("task.status.running").toLowerCase()} · {completedCount} {t("task.status.completed").toLowerCase()}
           </p>
         </div>
@@ -86,22 +86,22 @@ export default function TasksPage() {
 
       <div className="border border-border">
         <div className="grid grid-cols-[2fr_1fr_120px_140px_140px_120px] gap-4 border-b border-border bg-card px-4 py-3">
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("task.taskName")}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("task.taskType")}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("common.status")}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("task.createdTime")}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("task.duration")}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("common.actions")}
           </div>
         </div>
@@ -109,8 +109,8 @@ export default function TasksPage() {
         {sortedTasks.length === 0 ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
-              <TaskIcon className="mx-auto h-12 w-12 text-muted/30" />
-              <span className="mt-4 block font-mono text-xs text-muted">{t("task.noTasks")}</span>
+              <TaskIcon className="mx-auto h-12 w-12 text-muted-foreground/30" />
+              <span className="mt-4 block font-mono text-xs text-muted-foreground">{t("task.noTasks")}</span>
             </div>
           </div>
         ) : (
@@ -156,7 +156,7 @@ function TaskRow({ task, getTaskTypeLabel, formatDuration, formatTime, onCancel,
           </div>
         )}
       </div>
-      <div className="font-mono text-xs text-muted">
+      <div className="font-mono text-xs text-muted-foreground">
         {getTaskTypeLabel(task.type)}
       </div>
       <div>
@@ -167,17 +167,17 @@ function TaskRow({ task, getTaskTypeLabel, formatDuration, formatTime, onCancel,
           </div>
         )}
       </div>
-      <div className="font-mono text-xs text-muted">
+      <div className="font-mono text-xs text-muted-foreground">
         {formatTime(task.createdAt)}
       </div>
-      <div className="font-mono text-xs text-muted">
+      <div className="font-mono text-xs text-muted-foreground">
         {formatDuration(task.startedAt, task.completedAt)}
       </div>
       <div className="flex items-center gap-1">
         {canCancel ? (
           <button
             onClick={onCancel}
-            className="flex h-7 w-7 items-center justify-center text-muted hover:text-red-500"
+            className="flex h-7 w-7 items-center justify-center text-muted-foreground hover:text-red-500"
             title={t("task.cancel")}
           >
             <XIcon className="h-3.5 w-3.5" />
@@ -185,7 +185,7 @@ function TaskRow({ task, getTaskTypeLabel, formatDuration, formatTime, onCancel,
         ) : (
           <button
             onClick={onRemove}
-            className="flex h-7 w-7 items-center justify-center text-muted hover:text-foreground"
+            className="flex h-7 w-7 items-center justify-center text-muted-foreground hover:text-foreground"
             title={t("common.delete")}
           >
             <TrashIcon className="h-3.5 w-3.5" />
@@ -206,7 +206,7 @@ function StatusBadge({ status }: StatusBadgeProps) {
   const statusConfig: Record<TaskStatus, { label: string; className: string }> = {
     pending: {
       label: t("task.status.pending"),
-      className: "border-border bg-muted/20 text-muted",
+      className: "border-border bg-muted/20 text-muted-foreground",
     },
     running: {
       label: t("task.status.running"),

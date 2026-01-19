@@ -22,7 +22,7 @@ export default function Home() {
     <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-4">
         <div className="h-8 w-8 animate-pulse border border-foreground" />
-        <span className="font-mono text-[10px] uppercase tracking-widest text-muted">
+        <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
           {t("common.redirecting")}
         </span>
       </div>

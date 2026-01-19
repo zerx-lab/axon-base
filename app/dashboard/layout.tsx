@@ -17,6 +17,7 @@ const navigationItems = [
   { key: "nav.users", href: "/dashboard/users", icon: UsersIcon },
   { key: "nav.roles", href: "/dashboard/roles", icon: ShieldIcon },
   { key: "nav.knowledgeBases", href: "/dashboard/knowledge-bases", icon: BookIcon },
+  { key: "nav.chat", href: "/dashboard/chat", icon: ChatIcon },
   { key: "nav.tasks", href: "/dashboard/tasks", icon: TaskIcon },
   { key: "nav.settings", href: "/dashboard/settings", icon: SettingsIcon },
 ];
@@ -44,7 +45,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <div className="h-8 w-8 animate-pulse border border-foreground" />
-          <span className="font-mono text-[10px] uppercase tracking-widest text-muted">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("common.loading")}
           </span>
         </div>
@@ -101,7 +102,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 </Link>
                 <button
                   onClick={() => setSidebarCollapsed(true)}
-                  className="ml-auto flex h-6 w-6 items-center justify-center text-muted transition-colors hover:text-foreground"
+                  className="ml-auto flex h-6 w-6 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
                 >
                   <ChevronIcon collapsed={false} />
                 </button>
@@ -121,7 +122,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       className={`group flex h-10 items-center gap-3 px-3 font-mono text-xs transition-colors ${
                         isActive
                           ? "bg-foreground text-background"
-                          : "text-muted hover:bg-card hover:text-foreground"
+                          : "text-muted-foreground hover:bg-card hover:text-foreground"
                       }`}
                     >
                       <item.icon className="h-4 w-4 flex-shrink-0" />
@@ -222,6 +223,15 @@ function TaskIcon({ className }: { readonly className?: string }) {
       <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
       <rect x="9" y="3" width="6" height="4" rx="1" />
       <path d="M9 12l2 2 4-4" />
+    </svg>
+  );
+}
+
+function ChatIcon({ className }: { readonly className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      <path d="M8 10h8M8 14h4" />
     </svg>
   );
 }

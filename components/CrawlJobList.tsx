@@ -183,14 +183,14 @@ export function CrawlJobList({ kbId, onRefreshDocuments }: CrawlJobListProps) {
   // Get status badge color
   const getStatusColor = (status: CrawlJobStatus): string => {
     const colors: Record<CrawlJobStatus, string> = {
-      pending: "text-muted",
+      pending: "text-muted-foreground",
       running: "text-blue-500",
       paused: "text-yellow-500",
       completed: "text-green-500",
       failed: "text-red-500",
-      cancelled: "text-muted",
+      cancelled: "text-muted-foreground",
     };
-    return colors[status] || "text-muted";
+    return colors[status] || "text-muted-foreground";
   };
 
   // Get status background color for badge
@@ -209,7 +209,7 @@ export function CrawlJobList({ kbId, onRefreshDocuments }: CrawlJobListProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="text-sm text-muted font-mono">{t("common.loading")}</div>
+        <div className="text-sm text-muted-foreground font-mono">{t("common.loading")}</div>
       </div>
     );
   }
@@ -225,7 +225,7 @@ export function CrawlJobList({ kbId, onRefreshDocuments }: CrawlJobListProps) {
   if (jobs.length === 0) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="text-sm text-muted font-mono">{t("crawl.noJobs")}</div>
+        <div className="text-sm text-muted-foreground font-mono">{t("crawl.noJobs")}</div>
       </div>
     );
   }
@@ -258,7 +258,7 @@ export function CrawlJobList({ kbId, onRefreshDocuments }: CrawlJobListProps) {
                     >
                       {t(`crawl.status.${job.status}`)}
                     </span>
-                    <span className="text-[10px] text-muted font-mono">
+                    <span className="text-[10px] text-muted-foreground font-mono">
                       {new Date(job.created_at).toLocaleString()}
                     </span>
                   </div>
@@ -297,7 +297,7 @@ export function CrawlJobList({ kbId, onRefreshDocuments }: CrawlJobListProps) {
               {/* Progress Bar (for running jobs) */}
               {job.status === "running" && (
                 <div className="mb-3">
-                  <div className="flex items-center justify-between text-[10px] text-muted font-mono mb-1">
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground font-mono mb-1">
                     <span>{t("crawl.progress")}</span>
                     <span>{Math.round(job.progress)}%</span>
                   </div>
@@ -311,7 +311,7 @@ export function CrawlJobList({ kbId, onRefreshDocuments }: CrawlJobListProps) {
               )}
 
               {/* Stats */}
-              <div className="flex items-center gap-4 text-[10px] text-muted font-mono">
+              <div className="flex items-center gap-4 text-[10px] text-muted-foreground font-mono">
                 <span>
                   {t("crawl.pagesCrawled")}: {job.pages_crawled}
                 </span>
@@ -352,17 +352,17 @@ export function CrawlJobList({ kbId, onRefreshDocuments }: CrawlJobListProps) {
               </div>
               <div className="grid grid-cols-3 gap-4 text-[10px] font-mono">
                 <div>
-                  <div className="text-muted mb-1">{t("common.status")}</div>
+                  <div className="text-muted-foreground mb-1">{t("common.status")}</div>
                   <div className={getStatusColor(selectedJobData.status)}>
                     {t(`crawl.status.${selectedJobData.status}`)}
                   </div>
                 </div>
                 <div>
-                  <div className="text-muted mb-1">{t("crawl.pagesCrawled")}</div>
+                  <div className="text-muted-foreground mb-1">{t("crawl.pagesCrawled")}</div>
                   <div className="text-foreground">{selectedJobData.pages_crawled}</div>
                 </div>
                 <div>
-                  <div className="text-muted mb-1">{t("crawl.pagesFailed")}</div>
+                  <div className="text-muted-foreground mb-1">{t("crawl.pagesFailed")}</div>
                   <div className="text-red-500">{selectedJobData.failed_pages}</div>
                 </div>
               </div>
@@ -371,11 +371,11 @@ export function CrawlJobList({ kbId, onRefreshDocuments }: CrawlJobListProps) {
             {/* Pages List */}
             {detailsLoading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="text-sm text-muted font-mono">{t("common.loading")}</div>
+                <div className="text-sm text-muted-foreground font-mono">{t("common.loading")}</div>
               </div>
             ) : jobPages.length === 0 ? (
               <div className="flex items-center justify-center py-8">
-                <div className="text-sm text-muted font-mono">{t("common.noData")}</div>
+                <div className="text-sm text-muted-foreground font-mono">{t("common.noData")}</div>
               </div>
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto">
@@ -389,7 +389,7 @@ export function CrawlJobList({ kbId, onRefreshDocuments }: CrawlJobListProps) {
                         <div className="font-mono text-xs text-foreground mb-1 truncate">
                           {page.title || page.url}
                         </div>
-                        <div className="text-[10px] text-muted font-mono truncate">
+                        <div className="text-[10px] text-muted-foreground font-mono truncate">
                           {page.url}
                         </div>
                       </div>
@@ -413,7 +413,7 @@ export function CrawlJobList({ kbId, onRefreshDocuments }: CrawlJobListProps) {
                     )}
 
                     {page.crawled_at && (
-                      <div className="text-[10px] text-muted font-mono mt-2">
+                      <div className="text-[10px] text-muted-foreground font-mono mt-2">
                         {new Date(page.crawled_at).toLocaleString()}
                       </div>
                     )}

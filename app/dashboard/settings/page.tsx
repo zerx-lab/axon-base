@@ -143,6 +143,48 @@ const RERANKER_PROVIDER_PRESETS: Record<RerankerProvider, Partial<RerankerConfig
   },
 };
 
+interface PromptConfig {
+  chatWithContext: string;
+  chatNoContext: string;
+  docQA: string;
+}
+
+const DEFAULT_PROMPTS: PromptConfig = {
+  chatWithContext: `You are a knowledge base assistant. Answer questions based on the provided context from the knowledge base. If the context doesn't contain relevant information, you can briefly explain what you found and suggest rephrasing the question.
+
+{{customPrompt}}
+
+RULES:
+1. Prioritize information from the provided context
+2. If context is insufficient, acknowledge it honestly
+3. You may cite sources using [number] format
+4. For greetings or general questions about your capabilities, respond naturally
+
+Context from knowledge base:
+{{context}}`,
+  chatNoContext: `You are a knowledge base assistant. The search returned no relevant results for this query.
+
+Please respond helpfully:
+- For greetings, introduce yourself as a knowledge base assistant
+- For questions, suggest the user rephrase their query or check if the knowledge base contains relevant documents
+- Be polite and helpful`,
+  docQA: `You are a document Q&A assistant. Answer the user's question based ONLY on the provided document fragments below.
+
+STRICT RULES:
+1. You can ONLY use information from the provided fragments to answer
+2. If the fragments don't contain enough information, say "Based on the provided document content, I cannot find relevant information to answer this question."
+3. Do NOT make up or infer information that is not explicitly stated in the fragments
+4. Cite which fragment(s) your answer is based on when possible
+5. Keep your answer concise and accurate
+
+Document: "{{documentTitle}}"
+
+---
+DOCUMENT FRAGMENTS:
+{{context}}
+---`,
+};
+
 export default function SettingsPage() {
   const { t, locale, setLocale } = useI18n();
   const { theme, setTheme } = useTheme();
@@ -214,6 +256,11 @@ export default function SettingsPage() {
   } | null>(null);
   const [rerankerTestError, setRerankerTestError] = useState<{ message: string; details?: Record<string, unknown> } | null>(null);
 
+  const [promptConfig, setPromptConfig] = useState<PromptConfig>(DEFAULT_PROMPTS);
+  const [promptLoading, setPromptLoading] = useState(true);
+  const [promptSaving, setPromptSaving] = useState(false);
+  const [promptMessage, setPromptMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   const permissions = user?.permissions || [];
   const canEditSettings = permissions.includes(PERMISSIONS.SYSTEM_SETTINGS) || permissions.includes("*");
 
@@ -222,6 +269,7 @@ export default function SettingsPage() {
       setLoading(false);
       setChatLoading(false);
       setRerankerLoading(false);
+      setPromptLoading(false);
       return;
     }
     
@@ -258,11 +306,23 @@ export default function SettingsPage() {
       if (rerankerResult.setting?.value) {
         setRerankerConfig({ ...DEFAULT_RERANKER_CONFIG, ...rerankerResult.setting.value });
       }
+
+      const promptParams = new URLSearchParams({
+        operatorId: user.id,
+        key: "prompt_config",
+      });
+      const promptResponse = await fetch(`/api/settings?${promptParams}`);
+      const promptResult = await promptResponse.json();
+      
+      if (promptResult.setting?.value) {
+        setPromptConfig({ ...DEFAULT_PROMPTS, ...promptResult.setting.value });
+      }
     } catch (error) {
       console.error("Failed to fetch settings:", error);
     } finally {
       setLoading(false);
       setChatLoading(false);
+      setPromptLoading(false);
       setRerankerLoading(false);
     }
   }, [user?.id]);
@@ -587,6 +647,48 @@ export default function SettingsPage() {
     }
   };
 
+  const handlePromptSave = async () => {
+    if (!user?.id) return;
+    
+    setPromptSaving(true);
+    setPromptMessage(null);
+    
+    try {
+      const response = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operatorId: user.id,
+          key: "prompt_config",
+          value: promptConfig,
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setPromptMessage({ type: "success", text: t("settings.promptSaveSuccess") });
+        if (result.setting?.value) {
+          setPromptConfig({ ...DEFAULT_PROMPTS, ...result.setting.value });
+        }
+      } else {
+        setPromptMessage({ type: "error", text: result.error || t("settings.promptSaveFailed") });
+      }
+    } catch {
+      setPromptMessage({ type: "error", text: t("settings.promptSaveFailed") });
+    } finally {
+      setPromptSaving(false);
+    }
+  };
+
+  const handlePromptReset = (key: keyof PromptConfig) => {
+    setPromptConfig(prev => ({
+      ...prev,
+      [key]: DEFAULT_PROMPTS[key],
+    }));
+    setPromptMessage({ type: "success", text: t("settings.promptResetSuccess") });
+  };
+
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -597,7 +699,7 @@ export default function SettingsPage() {
 
       <div className="max-w-2xl space-y-8">
         <div className="border border-border p-6">
-          <h2 className="mb-4 font-mono text-xs font-medium uppercase tracking-widest text-muted">
+          <h2 className="mb-4 font-mono text-xs font-medium uppercase tracking-widest text-muted-foreground">
             {t("settings.language")}
           </h2>
           <div className="flex gap-3">
@@ -615,7 +717,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="border border-border p-6">
-          <h2 className="mb-4 font-mono text-xs font-medium uppercase tracking-widest text-muted">
+          <h2 className="mb-4 font-mono text-xs font-medium uppercase tracking-widest text-muted-foreground">
             {t("settings.theme")}
           </h2>
           <div className="flex gap-3">
@@ -636,16 +738,16 @@ export default function SettingsPage() {
 
         {canEditSettings && (
           <div className="border border-border p-6">
-            <h2 className="mb-4 font-mono text-xs font-medium uppercase tracking-widest text-muted">
+            <h2 className="mb-4 font-mono text-xs font-medium uppercase tracking-widest text-muted-foreground">
               {t("settings.embeddingModel")}
             </h2>
             
             {loading ? (
-              <div className="py-8 text-center text-muted">{t("common.loading")}</div>
+              <div className="py-8 text-center text-muted-foreground">{t("common.loading")}</div>
             ) : (
               <div className="space-y-6">
                 <div>
-                  <label className="mb-2 block font-mono text-xs text-muted">
+                  <label className="mb-2 block font-mono text-xs text-muted-foreground">
                     {t("settings.provider")}
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -662,7 +764,7 @@ export default function SettingsPage() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-2 block font-mono text-xs text-muted">
+                    <label className="mb-2 block font-mono text-xs text-muted-foreground">
                       {t("settings.baseUrl")}
                     </label>
                     <Input
@@ -672,7 +774,7 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="mb-2 block font-mono text-xs text-muted">
+                    <label className="mb-2 block font-mono text-xs text-muted-foreground">
                       {t("settings.apiKey")}
                     </label>
                     <Input
@@ -686,7 +788,7 @@ export default function SettingsPage() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-2 block font-mono text-xs text-muted">
+                    <label className="mb-2 block font-mono text-xs text-muted-foreground">
                       {t("settings.modelName")}
                     </label>
                     <Input
@@ -696,7 +798,7 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="mb-2 block font-mono text-xs text-muted">
+                    <label className="mb-2 block font-mono text-xs text-muted-foreground">
                       {t("settings.dimensions")}
                     </label>
                     <Input
@@ -711,7 +813,7 @@ export default function SettingsPage() {
 
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div>
-                    <label className="mb-2 block font-mono text-xs text-muted">
+                    <label className="mb-2 block font-mono text-xs text-muted-foreground">
                       {t("settings.batchSize")}
                     </label>
                     <Input
@@ -723,7 +825,7 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="mb-2 block font-mono text-xs text-muted">
+                    <label className="mb-2 block font-mono text-xs text-muted-foreground">
                       {t("settings.chunkSize")}
                     </label>
                     <Input
@@ -735,7 +837,7 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="mb-2 block font-mono text-xs text-muted">
+                    <label className="mb-2 block font-mono text-xs text-muted-foreground">
                       {t("settings.chunkOverlap")}
                     </label>
                     <Input
@@ -754,7 +856,7 @@ export default function SettingsPage() {
                       <label className="block font-mono text-xs text-foreground">
                         {t("settings.contextualRetrieval")}
                       </label>
-                      <p className="mt-1 font-mono text-[10px] text-muted">
+                      <p className="mt-1 font-mono text-[10px] text-muted-foreground">
                         {t("settings.contextualRetrievalDesc")}
                       </p>
                     </div>
@@ -781,7 +883,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="border-t border-border pt-6">
-                  <label className="mb-2 block font-mono text-xs text-muted">
+                  <label className="mb-2 block font-mono text-xs text-muted-foreground">
                     {t("settings.testText")}
                   </label>
                   <div className="flex gap-3">
@@ -813,15 +915,15 @@ export default function SettingsPage() {
                       </div>
                       <div className="grid gap-2 font-mono text-xs">
                         <div className="flex justify-between">
-                          <span className="text-muted">{t("settings.vectorDimensions")}:</span>
+                          <span className="text-muted-foreground">{t("settings.vectorDimensions")}:</span>
                           <span>{testResult.dimensions}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-muted">{t("settings.responseTime")}:</span>
+                          <span className="text-muted-foreground">{t("settings.responseTime")}:</span>
                           <span>{testResult.responseTime}ms</span>
                         </div>
                         <div>
-                          <span className="text-muted">{t("settings.vectorPreview")}:</span>
+                          <span className="text-muted-foreground">{t("settings.vectorPreview")}:</span>
                           <div className="mt-1 break-all rounded bg-background p-2 text-[10px]">
                             [{testResult.vectorPreview.map(v => v.toFixed(6)).join(", ")}...]
                           </div>
@@ -833,17 +935,17 @@ export default function SettingsPage() {
 
                 <div className="border-t border-border pt-6">
                   <div className="mb-4">
-                    <label className="mb-1 block font-mono text-xs text-muted">
+                    <label className="mb-1 block font-mono text-xs text-muted-foreground">
                       {t("settings.recallTest")}
                     </label>
-                    <p className="font-mono text-[10px] text-muted/70">
+                    <p className="font-mono text-[10px] text-muted-foreground/70">
                       {t("settings.recallTestDesc")}
                     </p>
                   </div>
                   
                   <div className="space-y-4">
                     <div>
-                      <label className="mb-2 block font-mono text-xs text-muted">
+                      <label className="mb-2 block font-mono text-xs text-muted-foreground">
                         {t("settings.recallQuery")}
                       </label>
                       <Input
@@ -855,7 +957,7 @@ export default function SettingsPage() {
                     
                     <div>
                       <div className="mb-2 flex items-center justify-between">
-                        <label className="font-mono text-xs text-muted">
+                        <label className="font-mono text-xs text-muted-foreground">
                           {t("settings.candidateTexts")}
                         </label>
                         <Button
@@ -870,7 +972,7 @@ export default function SettingsPage() {
                       <div className="space-y-2">
                         {candidates.map((candidate, index) => (
                           <div key={index} className="flex gap-2">
-                            <div className="flex h-10 w-6 shrink-0 items-center justify-center font-mono text-[10px] text-muted">
+                            <div className="flex h-10 w-6 shrink-0 items-center justify-center font-mono text-[10px] text-muted-foreground">
                               {index + 1}
                             </div>
                             <Input
@@ -883,7 +985,7 @@ export default function SettingsPage() {
                               onClick={() => handleRemoveCandidate(index)}
                               variant="ghost"
                               disabled={candidates.length <= 1}
-                              className="h-10 w-10 shrink-0 p-0 text-muted hover:text-red-500"
+                              className="h-10 w-10 shrink-0 p-0 text-muted-foreground hover:text-red-500"
                             >
                               ×
                             </Button>
@@ -914,7 +1016,7 @@ export default function SettingsPage() {
                           <span className="font-mono text-xs text-green-500">
                             {t("settings.recallTestSuccess")}
                           </span>
-                          <span className="font-mono text-[10px] text-muted">
+                          <span className="font-mono text-[10px] text-muted-foreground">
                             {recallResult.responseTime}ms · {recallResult.dimensions} dims
                           </span>
                         </div>
@@ -959,16 +1061,16 @@ export default function SettingsPage() {
 
         {canEditSettings && (
           <div className="border border-border p-6">
-            <h2 className="mb-4 font-mono text-xs font-medium uppercase tracking-widest text-muted">
+            <h2 className="mb-4 font-mono text-xs font-medium uppercase tracking-widest text-muted-foreground">
               {t("settings.chatModelConfig")}
             </h2>
             
             {chatLoading ? (
-              <div className="py-8 text-center text-muted">{t("common.loading")}</div>
+              <div className="py-8 text-center text-muted-foreground">{t("common.loading")}</div>
             ) : (
               <div className="space-y-6">
                 <div>
-                  <label className="mb-2 block font-mono text-xs text-muted">
+                  <label className="mb-2 block font-mono text-xs text-muted-foreground">
                     {t("settings.chatProvider")}
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -985,7 +1087,7 @@ export default function SettingsPage() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-2 block font-mono text-xs text-muted">
+                    <label className="mb-2 block font-mono text-xs text-muted-foreground">
                       {t("settings.chatBaseUrl")}
                     </label>
                     <Input
@@ -995,7 +1097,7 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="mb-2 block font-mono text-xs text-muted">
+                    <label className="mb-2 block font-mono text-xs text-muted-foreground">
                       {t("settings.chatApiKey")}
                     </label>
                     <Input
@@ -1009,7 +1111,7 @@ export default function SettingsPage() {
 
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div>
-                    <label className="mb-2 block font-mono text-xs text-muted">
+                    <label className="mb-2 block font-mono text-xs text-muted-foreground">
                       {t("settings.chatModelName")}
                     </label>
                     <Input
@@ -1019,7 +1121,7 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="mb-2 block font-mono text-xs text-muted">
+                    <label className="mb-2 block font-mono text-xs text-muted-foreground">
                       {t("settings.chatMaxTokens")}
                     </label>
                     <Input
@@ -1031,7 +1133,7 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="mb-2 block font-mono text-xs text-muted">
+                    <label className="mb-2 block font-mono text-xs text-muted-foreground">
                       {t("settings.chatTemperature")}
                     </label>
                     <Input
@@ -1046,7 +1148,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="border-t border-border pt-6">
-                  <label className="mb-2 block font-mono text-xs text-muted">
+                  <label className="mb-2 block font-mono text-xs text-muted-foreground">
                     {t("settings.testMessage")}
                   </label>
                   <div className="flex gap-3">
@@ -1078,17 +1180,17 @@ export default function SettingsPage() {
                       </div>
                       <div className="space-y-2 font-mono text-xs">
                         <div className="flex justify-between">
-                          <span className="text-muted">{t("settings.chatResponseTime")}:</span>
+                          <span className="text-muted-foreground">{t("settings.chatResponseTime")}:</span>
                           <span>{chatTestResult.responseTime}ms</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-muted">{t("settings.chatTokenUsage")}:</span>
+                          <span className="text-muted-foreground">{t("settings.chatTokenUsage")}:</span>
                           <span>
                             {t("settings.inputTokens")}: {chatTestResult.usage.inputTokens ?? "-"} / {t("settings.outputTokens")}: {chatTestResult.usage.outputTokens ?? "-"}
                           </span>
                         </div>
                         <div>
-                          <span className="text-muted">{t("settings.chatResponse")}:</span>
+                          <span className="text-muted-foreground">{t("settings.chatResponse")}:</span>
                           <div className="mt-1 whitespace-pre-wrap rounded bg-background p-2 text-[11px]">
                             {chatTestResult.text}
                           </div>
@@ -1116,12 +1218,12 @@ export default function SettingsPage() {
 
         {canEditSettings && (
           <div className="border border-border p-6">
-            <h2 className="mb-4 font-mono text-xs font-medium uppercase tracking-widest text-muted">
+            <h2 className="mb-4 font-mono text-xs font-medium uppercase tracking-widest text-muted-foreground">
               {t("settings.rerankerConfig")}
             </h2>
             
             {rerankerLoading ? (
-              <div className="py-8 text-center text-muted">{t("common.loading")}</div>
+              <div className="py-8 text-center text-muted-foreground">{t("common.loading")}</div>
             ) : (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
@@ -1129,7 +1231,7 @@ export default function SettingsPage() {
                     <label className="block font-mono text-xs text-foreground">
                       {t("settings.rerankerEnabled")}
                     </label>
-                    <p className="mt-1 font-mono text-[10px] text-muted">
+                    <p className="mt-1 font-mono text-[10px] text-muted-foreground">
                       {t("settings.rerankerEnabledDesc")}
                     </p>
                   </div>
@@ -1154,7 +1256,7 @@ export default function SettingsPage() {
                 {rerankerConfig.enabled && (
                   <>
                     <div>
-                      <label className="mb-2 block font-mono text-xs text-muted">
+                      <label className="mb-2 block font-mono text-xs text-muted-foreground">
                         {t("settings.rerankerProvider")}
                       </label>
                       <div className="flex flex-wrap gap-2">
@@ -1171,7 +1273,7 @@ export default function SettingsPage() {
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
-                        <label className="mb-2 block font-mono text-xs text-muted">
+                        <label className="mb-2 block font-mono text-xs text-muted-foreground">
                           {t("settings.rerankerBaseUrl")}
                         </label>
                         <Input
@@ -1181,7 +1283,7 @@ export default function SettingsPage() {
                         />
                       </div>
                       <div>
-                        <label className="mb-2 block font-mono text-xs text-muted">
+                        <label className="mb-2 block font-mono text-xs text-muted-foreground">
                           {t("settings.rerankerApiKey")}
                         </label>
                         <Input
@@ -1195,7 +1297,7 @@ export default function SettingsPage() {
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
-                        <label className="mb-2 block font-mono text-xs text-muted">
+                        <label className="mb-2 block font-mono text-xs text-muted-foreground">
                           {t("settings.rerankerModel")}
                         </label>
                         <Input
@@ -1206,7 +1308,7 @@ export default function SettingsPage() {
                       </div>
                       {rerankerConfig.provider === "openai-compatible" && (
                         <div>
-                          <label className="mb-2 block font-mono text-xs text-muted">
+                          <label className="mb-2 block font-mono text-xs text-muted-foreground">
                             {t("settings.rerankerResponseFormat")}
                           </label>
                           <div className="flex flex-wrap gap-2">
@@ -1219,7 +1321,7 @@ export default function SettingsPage() {
                               />
                             ))}
                           </div>
-                          <p className="mt-2 font-mono text-[10px] text-muted">
+                          <p className="mt-2 font-mono text-[10px] text-muted-foreground">
                             {t("settings.rerankerResponseFormatDesc")}
                           </p>
                         </div>
@@ -1228,17 +1330,17 @@ export default function SettingsPage() {
 
                     <div className="border-t border-border pt-6">
                       <div className="mb-4">
-                        <label className="mb-1 block font-mono text-xs text-muted">
+                        <label className="mb-1 block font-mono text-xs text-muted-foreground">
                           {t("settings.testReranker")}
                         </label>
-                        <p className="font-mono text-[10px] text-muted/70">
+                        <p className="font-mono text-[10px] text-muted-foreground/70">
                           {t("settings.rerankerTestDesc")}
                         </p>
                       </div>
                       
                       <div className="space-y-4">
                         <div>
-                          <label className="mb-2 block font-mono text-xs text-muted">
+                          <label className="mb-2 block font-mono text-xs text-muted-foreground">
                             {t("settings.rerankerTestQuery")}
                           </label>
                           <Input
@@ -1250,7 +1352,7 @@ export default function SettingsPage() {
                         
                         <div>
                           <div className="mb-2 flex items-center justify-between">
-                            <label className="font-mono text-xs text-muted">
+                            <label className="font-mono text-xs text-muted-foreground">
                               {t("settings.rerankerTestDocument")}
                             </label>
                             <Button
@@ -1265,7 +1367,7 @@ export default function SettingsPage() {
                           <div className="space-y-2">
                             {rerankerTestDocs.map((doc, index) => (
                               <div key={index} className="flex gap-2">
-                                <div className="flex h-10 w-6 shrink-0 items-center justify-center font-mono text-[10px] text-muted">
+                                <div className="flex h-10 w-6 shrink-0 items-center justify-center font-mono text-[10px] text-muted-foreground">
                                   {index + 1}
                                 </div>
                                 <Input
@@ -1278,7 +1380,7 @@ export default function SettingsPage() {
                                   onClick={() => handleRemoveRerankerTestDoc(index)}
                                   variant="ghost"
                                   disabled={rerankerTestDocs.length <= 1}
-                                  className="h-10 w-10 shrink-0 p-0 text-muted hover:text-red-500"
+                                  className="h-10 w-10 shrink-0 p-0 text-muted-foreground hover:text-red-500"
                                 >
                                   ×
                                 </Button>
@@ -1303,7 +1405,7 @@ export default function SettingsPage() {
                               {rerankerTestError.message}
                             </div>
                             {rerankerTestError.details && (
-                              <div className="space-y-1 font-mono text-[10px] text-muted">
+                              <div className="space-y-1 font-mono text-[10px] text-muted-foreground">
                                 {"url" in rerankerTestError.details && (
                                   <div>URL: {rerankerTestError.details.url as string}</div>
                                 )}
@@ -1324,7 +1426,7 @@ export default function SettingsPage() {
                               <span className="font-mono text-xs text-green-500">
                                 {t("settings.rerankerTestSuccess")}
                               </span>
-                              <span className="font-mono text-[10px] text-muted">
+                              <span className="font-mono text-[10px] text-muted-foreground">
                                 {rerankerTestResult.responseTime}ms
                               </span>
                             </div>
@@ -1334,7 +1436,7 @@ export default function SettingsPage() {
                                 <div className="mb-2 flex items-center justify-between">
                                   <span className="font-mono text-[10px] text-blue-500">
                                     {t("settings.detectedFormat")}: {rerankerTestResult.detectedFormat}
-                                    <span className="ml-2 text-muted">({rerankerTestResult.formatConfidence})</span>
+                                    <span className="ml-2 text-muted-foreground">({rerankerTestResult.formatConfidence})</span>
                                   </span>
                                   {rerankerTestResult.detectedFormat !== rerankerConfig.responseFormat && (
                                     <Button
@@ -1346,14 +1448,14 @@ export default function SettingsPage() {
                                     </Button>
                                   )}
                                 </div>
-                                <p className="font-mono text-[10px] text-muted">
+                                <p className="font-mono text-[10px] text-muted-foreground">
                                   {rerankerTestResult.formatReason}
                                 </p>
                               </div>
                             )}
                             
                             <div className="space-y-2">
-                              <span className="font-mono text-[10px] text-muted">{t("settings.rerankerResults")}:</span>
+                              <span className="font-mono text-[10px] text-muted-foreground">{t("settings.rerankerResults")}:</span>
                               {rerankerTestResult.results.map((item, index) => (
                                 <div key={index} className="flex items-start gap-3 rounded border border-border bg-background p-3">
                                   <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted/20 font-mono text-[10px] font-medium">
@@ -1392,6 +1494,113 @@ export default function SettingsPage() {
             )}
           </div>
         )}
+
+        {/* Prompt Configuration Section */}
+        {canEditSettings && (
+          <div className="border border-border p-6">
+            <h2 className="mb-2 font-mono text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              {t("settings.promptConfig")}
+            </h2>
+            <p className="mb-6 font-mono text-[10px] text-muted-foreground">
+              {t("settings.promptConfigDesc")}
+            </p>
+
+            {promptLoading ? (
+              <div className="flex h-32 items-center justify-center">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Chat With Context Prompt */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="font-mono text-xs font-medium">
+                      {t("settings.chatWithContextPrompt")}
+                    </label>
+                    <button
+                      onClick={() => handlePromptReset("chatWithContext")}
+                      className="font-mono text-[10px] text-muted-foreground hover:text-foreground"
+                    >
+                      {t("settings.resetToDefault")}
+                    </button>
+                  </div>
+                  <p className="font-mono text-[10px] text-muted-foreground">
+                    {t("settings.chatWithContextPromptDesc")}
+                  </p>
+                  <textarea
+                    value={promptConfig.chatWithContext}
+                    onChange={(e) => setPromptConfig(prev => ({ ...prev, chatWithContext: e.target.value }))}
+                    rows={8}
+                    className="w-full resize-y border border-border bg-background px-3 py-2 font-mono text-xs focus:border-foreground focus:outline-none"
+                    placeholder="Enter chat prompt for when context is available..."
+                  />
+                </div>
+
+                {/* Chat No Context Prompt */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="font-mono text-xs font-medium">
+                      {t("settings.chatNoContextPrompt")}
+                    </label>
+                    <button
+                      onClick={() => handlePromptReset("chatNoContext")}
+                      className="font-mono text-[10px] text-muted-foreground hover:text-foreground"
+                    >
+                      {t("settings.resetToDefault")}
+                    </button>
+                  </div>
+                  <p className="font-mono text-[10px] text-muted-foreground">
+                    {t("settings.chatNoContextPromptDesc")}
+                  </p>
+                  <textarea
+                    value={promptConfig.chatNoContext}
+                    onChange={(e) => setPromptConfig(prev => ({ ...prev, chatNoContext: e.target.value }))}
+                    rows={6}
+                    className="w-full resize-y border border-border bg-background px-3 py-2 font-mono text-xs focus:border-foreground focus:outline-none"
+                    placeholder="Enter chat prompt for when no context is found..."
+                  />
+                </div>
+
+                {/* Document Q&A Prompt */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="font-mono text-xs font-medium">
+                      {t("settings.docQAPrompt")}
+                    </label>
+                    <button
+                      onClick={() => handlePromptReset("docQA")}
+                      className="font-mono text-[10px] text-muted-foreground hover:text-foreground"
+                    >
+                      {t("settings.resetToDefault")}
+                    </button>
+                  </div>
+                  <p className="font-mono text-[10px] text-muted-foreground">
+                    {t("settings.docQAPromptDesc")}
+                  </p>
+                  <textarea
+                    value={promptConfig.docQA}
+                    onChange={(e) => setPromptConfig(prev => ({ ...prev, docQA: e.target.value }))}
+                    rows={10}
+                    className="w-full resize-y border border-border bg-background px-3 py-2 font-mono text-xs focus:border-foreground focus:outline-none"
+                    placeholder="Enter document Q&A prompt..."
+                  />
+                </div>
+
+                {promptMessage && (
+                  <div className={`font-mono text-xs ${promptMessage.type === "success" ? "text-green-500" : "text-red-500"}`}>
+                    {promptMessage.text}
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  <Button onClick={handlePromptSave} disabled={promptSaving}>
+                    {promptSaving ? t("common.saving") : t("common.save")}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1411,7 +1620,7 @@ function OptionButton({ selected, onClick, label, icon }: OptionButtonProps) {
       className={`flex h-10 items-center gap-2 border px-4 font-mono text-xs uppercase tracking-wider transition-colors ${
         selected
           ? "border-foreground bg-foreground text-background"
-          : "border-border text-muted hover:border-foreground hover:text-foreground"
+          : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
       }`}
     >
       {icon}

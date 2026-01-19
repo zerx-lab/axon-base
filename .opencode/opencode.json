@@ -12,6 +12,10 @@
     "next-devtools": {
       "type": "local",
       "command": ["bunx", "-y", "next-devtools-mcp@latest"]
+    },
+    "assistant-ui": {
+      "type": "local",
+      "command": ["npx", "-y", "@assistant-ui/mcp-docs-server"]
     }
   }
 }

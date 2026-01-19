@@ -219,7 +219,16 @@ export async function searchSimilarChunks(
   });
 
   if (error) throw error;
-  return data || [];
+  return (data || []).map((r: Record<string, unknown>) => ({
+    chunk_id: r.chunk_id as string,
+    document_id: r.document_id as string,
+    document_title: r.document_title as string,
+    document_source_url: (r.document_source_url as string) || null,
+    chunk_content: r.chunk_content as string,
+    chunk_context: r.chunk_context as string | undefined,
+    chunk_index: r.chunk_index as number,
+    similarity: r.similarity as number,
+  }));
 }
 
 export async function hybridSearchChunks(
@@ -249,6 +258,7 @@ export async function hybridSearchChunks(
       chunk_id: r.chunk_id,
       document_id: r.document_id,
       document_title: r.document_title,
+      document_source_url: r.document_source_url,
       chunk_content: r.chunk_content,
       chunk_context: r.chunk_context ?? null,
       chunk_index: r.chunk_index,
@@ -271,6 +281,7 @@ export async function hybridSearchChunks(
       chunk_id: r.chunk_id,
       document_id: r.document_id,
       document_title: r.document_title,
+      document_source_url: null,
       chunk_content: r.chunk_content,
       chunk_context: r.chunk_context,
       chunk_index: r.chunk_index,
@@ -294,6 +305,52 @@ export async function hybridSearchChunks(
 
   if (error) throw error;
   return data || [];
+}
+
+export async function hybridSearchChunksMultiKb(
+  supabase: SupabaseClient,
+  queryText: string,
+  queryEmbedding: number[],
+  kbIds: string[],
+  options: HybridSearchOptions = {}
+): Promise<HybridSearchChunk[]> {
+  const {
+    matchCount = 20,
+    matchThreshold = 0.3,
+    vectorWeight = 0.5,
+    rrfK = 60,
+  } = options;
+
+  const allResults: HybridSearchChunk[] = [];
+  
+  for (const kbId of kbIds) {
+    const { data, error } = await supabase.rpc("hybrid_search_chunks", {
+      query_text: queryText,
+      query_embedding: queryEmbedding,
+      target_kb_id: kbId,
+      match_count: matchCount,
+      match_threshold: matchThreshold,
+      vector_weight: vectorWeight,
+      rrf_k: rrfK,
+    });
+
+    if (error) {
+      console.error(`Search error for KB ${kbId}:`, error);
+      continue;
+    }
+    
+    if (data) {
+      const resultsWithKbId = data.map((item: HybridSearchChunk) => ({
+        ...item,
+        kb_id: kbId,
+      }));
+      allResults.push(...resultsWithKbId);
+    }
+  }
+  
+  return allResults
+    .sort((a, b) => (b.combined_score || 0) - (a.combined_score || 0))
+    .slice(0, matchCount);
 }
 
 export async function hybridSearchForReranking(

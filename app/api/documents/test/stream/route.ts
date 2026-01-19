@@ -6,7 +6,8 @@ import { streamText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import type { ChatConfig, SearchType, RerankerConfig } from "@/lib/supabase/types";
+import type { ChatConfig, SearchType, RerankerConfig, PromptConfig } from "@/lib/supabase/types";
+import { DEFAULT_PROMPTS } from "@/lib/supabase/types";
 import {
   generateSingleEmbedding,
   getEmbeddingConfig,
@@ -16,7 +17,6 @@ import { hybridSearchWithReranking } from "@/lib/reranker";
 import {
   t,
   parseLocale,
-  buildDocQASystemPrompt,
   formatChunkContext,
   type Locale,
 } from "@/lib/i18n-server";
@@ -162,6 +162,7 @@ export async function POST(request: NextRequest) {
         chunk_id: r.chunk_id,
         document_id: r.document_id,
         document_title: doc.title,
+        document_source_url: null,
         chunk_content: r.chunk_content,
         chunk_context: r.chunk_context,
         chunk_index: r.chunk_index,
@@ -281,8 +282,20 @@ async function streamAnswer(
         return;
       }
 
+      const { data: promptConfigData } = await supabase
+        .from("system_settings")
+        .select("value")
+        .eq("key", "prompt_config")
+        .single();
+      
+      const promptConfig: PromptConfig = promptConfigData?.value 
+        ? { ...DEFAULT_PROMPTS, ...(promptConfigData.value as Partial<PromptConfig>) }
+        : DEFAULT_PROMPTS;
+
       const context = formatChunkContext(chunks, locale);
-      const systemPrompt = buildDocQASystemPrompt(documentTitle, context, locale);
+      const systemPrompt = promptConfig.docQA
+        .replace("{{documentTitle}}", documentTitle)
+        .replace("{{context}}", context);
 
       try {
         const model = createChatProvider(chatConfig);

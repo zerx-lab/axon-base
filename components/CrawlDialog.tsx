@@ -148,7 +148,7 @@ export function CrawlDialog({ open, onClose, kbId, userId }: CrawlDialogProps) {
     >
       <div className="space-y-4">
         <div className="space-y-2">
-          <label className="block font-mono text-[10px] uppercase tracking-widest text-muted">
+          <label className="block font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("crawl.mode")}
           </label>
           <div className="flex gap-2">
@@ -191,7 +191,7 @@ export function CrawlDialog({ open, onClose, kbId, userId }: CrawlDialogProps) {
           <>
             <div className="space-y-2">
               <label className="flex items-center justify-between">
-                <span className="font-mono text-[10px] uppercase tracking-widest text-muted">
+                <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                   {t("crawl.maxDepth")}
                 </span>
                 <span className="font-mono text-xs text-foreground">{maxDepth}</span>
@@ -209,7 +209,7 @@ export function CrawlDialog({ open, onClose, kbId, userId }: CrawlDialogProps) {
 
             <div className="space-y-2">
               <label className="flex items-center justify-between">
-                <span className="font-mono text-[10px] uppercase tracking-widest text-muted">
+                <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                   {t("crawl.maxPages")}
                 </span>
                 <span className="font-mono text-xs text-foreground">{maxPages}</span>
@@ -231,10 +231,10 @@ export function CrawlDialog({ open, onClose, kbId, userId }: CrawlDialogProps) {
         <div className="border-t border-border pt-4">
           <label className="flex items-center justify-between cursor-pointer">
             <div>
-              <span className="font-mono text-[10px] uppercase tracking-widest text-muted">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                 {t("crawl.useAi")}
               </span>
-              <p className="text-[10px] text-muted/70 mt-0.5">
+              <p className="text-[10px] text-muted-foreground/70 mt-0.5">
                 {t("crawl.useAiDesc")}
               </p>
             </div>
@@ -258,7 +258,7 @@ export function CrawlDialog({ open, onClose, kbId, userId }: CrawlDialogProps) {
         {useAi && (
           <div className="space-y-4 border border-border/50 bg-foreground/[0.02] p-4">
             <div className="space-y-2">
-              <label className="block font-mono text-[10px] uppercase tracking-widest text-muted">
+              <label className="block font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                 {t("crawl.extractionMode")}
               </label>
               <div className="flex gap-2">
@@ -282,7 +282,7 @@ export function CrawlDialog({ open, onClose, kbId, userId }: CrawlDialogProps) {
 
             {extractionMode === "auto" && (
               <div className="space-y-2">
-                <label className="block font-mono text-[10px] uppercase tracking-widest text-muted">
+                <label className="block font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                   {t("crawl.extractionPrompt")}
                 </label>
                 <textarea
@@ -291,14 +291,14 @@ export function CrawlDialog({ open, onClose, kbId, userId }: CrawlDialogProps) {
                   placeholder={t("crawl.extractionPromptPlaceholder")}
                   disabled={isSubmitting}
                   rows={2}
-                  className="w-full border border-border bg-card px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted/50 focus:border-foreground focus:outline-none resize-none"
+                  className="w-full border border-border bg-card px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground/50 focus:border-foreground focus:outline-none resize-none"
                 />
               </div>
             )}
 
             {extractionMode === "preset" && (
               <div className="space-y-2">
-                <label className="block font-mono text-[10px] uppercase tracking-widest text-muted">
+                <label className="block font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                   {t("crawl.preset")}
                 </label>
                 <select
@@ -347,7 +347,7 @@ export function CrawlDialog({ open, onClose, kbId, userId }: CrawlDialogProps) {
                 <span className="font-mono text-[10px] text-foreground">
                   {t("crawl.forceReanalyze")}
                 </span>
-                <p className="text-[10px] text-muted/70">
+                <p className="text-[10px] text-muted-foreground/70">
                   {t("crawl.forceReanalyzeDesc")}
                 </p>
               </div>
@@ -359,7 +359,7 @@ export function CrawlDialog({ open, onClose, kbId, userId }: CrawlDialogProps) {
           <button
             type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex w-full items-center justify-between font-mono text-[10px] uppercase tracking-widest text-muted hover:text-foreground"
+            className="flex w-full items-center justify-between font-mono text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
             disabled={isSubmitting}
           >
             {t("crawl.advancedSettings")}

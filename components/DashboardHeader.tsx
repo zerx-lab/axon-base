@@ -64,7 +64,7 @@ export function DashboardHeader({ user, onLogout }: DashboardHeaderProps) {
       <div ref={taskMenuRef} className="relative">
         <button
           onClick={() => setTaskMenuOpen(!taskMenuOpen)}
-          className="flex h-8 items-center gap-1.5 border border-border px-3 font-mono text-[10px] uppercase tracking-wider text-muted transition-colors hover:border-foreground hover:text-foreground"
+          className="flex h-8 items-center gap-1.5 border border-border px-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
         >
           <TaskIcon className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">{t("task.title")}</span>
@@ -78,13 +78,13 @@ export function DashboardHeader({ user, onLogout }: DashboardHeaderProps) {
         {taskMenuOpen && (
           <div className="absolute right-0 top-full mt-1 w-80 border border-border bg-background shadow-lg">
             <div className="flex items-center justify-between border-b border-border px-3 py-2">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-muted">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                 {t("task.title")}
               </span>
               {hasCompletedTasks && (
                 <button
                   onClick={clearCompletedTasks}
-                  className="font-mono text-[10px] text-muted transition-colors hover:text-foreground"
+                  className="font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {t("task.clearCompleted")}
                 </button>
@@ -92,7 +92,7 @@ export function DashboardHeader({ user, onLogout }: DashboardHeaderProps) {
             </div>
             <div className="max-h-80 overflow-y-auto">
               {sortedTasks.length === 0 ? (
-                <div className="px-4 py-6 text-center font-mono text-xs text-muted">
+                <div className="px-4 py-6 text-center font-mono text-xs text-muted-foreground">
                   {t("task.noTasks")}
                 </div>
               ) : (
@@ -116,7 +116,7 @@ export function DashboardHeader({ user, onLogout }: DashboardHeaderProps) {
       <div ref={langMenuRef} className="relative">
         <button
           onClick={() => setLangMenuOpen(!langMenuOpen)}
-          className="flex h-8 items-center gap-1.5 border border-border px-3 font-mono text-[10px] uppercase tracking-wider text-muted transition-colors hover:border-foreground hover:text-foreground"
+          className="flex h-8 items-center gap-1.5 border border-border px-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
         >
           <GlobeIcon className="h-3.5 w-3.5" />
           <span>{locale === "zh" ? "CN" : "EN"}</span>
@@ -132,7 +132,7 @@ export function DashboardHeader({ user, onLogout }: DashboardHeaderProps) {
               className={`flex w-full items-center gap-2 px-3 py-2 font-mono text-xs transition-colors ${
                 locale === "zh"
                   ? "bg-foreground text-background"
-                  : "text-muted hover:bg-card hover:text-foreground"
+                  : "text-muted-foreground hover:bg-card hover:text-foreground"
               }`}
             >
               {locale === "zh" && <CheckIcon className="h-3 w-3" />}
@@ -146,7 +146,7 @@ export function DashboardHeader({ user, onLogout }: DashboardHeaderProps) {
               className={`flex w-full items-center gap-2 px-3 py-2 font-mono text-xs transition-colors ${
                 locale === "en"
                   ? "bg-foreground text-background"
-                  : "text-muted hover:bg-card hover:text-foreground"
+                  : "text-muted-foreground hover:bg-card hover:text-foreground"
               }`}
             >
               {locale === "en" && <CheckIcon className="h-3 w-3" />}
@@ -159,7 +159,7 @@ export function DashboardHeader({ user, onLogout }: DashboardHeaderProps) {
       {/* Theme Toggle */}
       <button
         onClick={toggleTheme}
-        className="flex h-8 w-8 items-center justify-center border border-border text-muted transition-colors hover:border-foreground hover:text-foreground"
+        className="flex h-8 w-8 items-center justify-center border border-border text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
         title={theme === "light" ? t("settings.themeDark") : t("settings.themeLight")}
       >
         {theme === "light" ? <MoonIcon className="h-3.5 w-3.5" /> : <SunIcon className="h-3.5 w-3.5" />}
@@ -169,7 +169,7 @@ export function DashboardHeader({ user, onLogout }: DashboardHeaderProps) {
       <div ref={userMenuRef} className="relative">
         <button
           onClick={() => setUserMenuOpen(!userMenuOpen)}
-          className="flex h-8 items-center gap-2 border border-border px-3 font-mono text-[10px] uppercase tracking-wider text-muted transition-colors hover:border-foreground hover:text-foreground"
+          className="flex h-8 items-center gap-2 border border-border px-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
         >
           <div className="flex h-5 w-5 items-center justify-center border border-current">
             <span className="text-[9px]">{user?.username.charAt(0).toUpperCase()}</span>
@@ -184,7 +184,7 @@ export function DashboardHeader({ user, onLogout }: DashboardHeaderProps) {
               <p className="font-mono text-xs font-medium">
                 {user?.displayName || user?.username}
               </p>
-              <p className="font-mono text-[10px] uppercase tracking-wider text-muted">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                 {user?.isSuperAdmin ? t("role.super_admin") : t("role.user")}
               </p>
             </div>
@@ -194,7 +194,7 @@ export function DashboardHeader({ user, onLogout }: DashboardHeaderProps) {
                 setUserMenuOpen(false);
                 onLogout();
               }}
-              className="flex w-full items-center gap-2 px-3 py-2 font-mono text-xs text-muted transition-colors hover:bg-card hover:text-foreground"
+              className="flex w-full items-center gap-2 px-3 py-2 font-mono text-xs text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
             >
               <LogoutIcon className="h-3.5 w-3.5" />
               <span>{t("auth.signOut")}</span>
@@ -315,7 +315,7 @@ function TaskItem({ task, onCancel, onRemove }: TaskItemProps) {
           {canCancel && (
             <button
               onClick={onCancel}
-              className="p-1 text-muted transition-colors hover:text-foreground"
+              className="p-1 text-muted-foreground transition-colors hover:text-foreground"
               title={t("task.cancel")}
             >
               <XIcon className="h-3 w-3" />
@@ -324,7 +324,7 @@ function TaskItem({ task, onCancel, onRemove }: TaskItemProps) {
           {canRemove && (
             <button
               onClick={onRemove}
-              className="p-1 text-muted transition-colors hover:text-foreground"
+              className="p-1 text-muted-foreground transition-colors hover:text-foreground"
               title={t("common.delete")}
             >
               <XIcon className="h-3 w-3" />
@@ -351,7 +351,7 @@ function StatusBadge({ status }: StatusBadgeProps) {
   const statusConfig: Record<TaskStatus, { label: string; className: string }> = {
     pending: {
       label: t("task.status.pending"),
-      className: "bg-muted/30 text-muted",
+      className: "bg-muted/30 text-muted-foreground",
     },
     running: {
       label: t("task.status.running"),

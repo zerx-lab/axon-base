@@ -46,7 +46,7 @@ export function TaskPanel() {
               {hasCompletedTasks && (
                 <button
                   onClick={clearCompletedTasks}
-                  className="p-1.5 text-muted transition-colors hover:text-foreground"
+                  className="p-1.5 text-muted-foreground transition-colors hover:text-foreground"
                   title={t("task.clearCompleted")}
                 >
                   <ClearIcon className="h-3.5 w-3.5" />
@@ -54,7 +54,7 @@ export function TaskPanel() {
               )}
               <button
                 onClick={() => setTaskPanelOpen(false)}
-                className="p-1.5 text-muted transition-colors hover:text-foreground"
+                className="p-1.5 text-muted-foreground transition-colors hover:text-foreground"
               >
                 <ChevronDownIcon className="h-4 w-4" />
               </button>
@@ -63,7 +63,7 @@ export function TaskPanel() {
 
           <div className="max-h-80 overflow-y-auto">
             {sortedTasks.length === 0 ? (
-              <div className="px-4 py-8 text-center font-mono text-xs text-muted">
+              <div className="px-4 py-8 text-center font-mono text-xs text-muted-foreground">
                 {t("task.noTasks")}
               </div>
             ) : (
@@ -121,7 +121,7 @@ function TaskItem({ task, onCancel, onRemove }: TaskItemProps) {
             <span className="truncate font-mono text-xs">{task.title}</span>
           </div>
           {task.description && (
-            <p className="mt-1 truncate font-mono text-[10px] text-muted">
+            <p className="mt-1 truncate font-mono text-[10px] text-muted-foreground">
               {task.description}
             </p>
           )}
@@ -135,7 +135,7 @@ function TaskItem({ task, onCancel, onRemove }: TaskItemProps) {
           {canCancel && (
             <button
               onClick={onCancel}
-              className="p-1 text-muted transition-colors hover:text-foreground"
+              className="p-1 text-muted-foreground transition-colors hover:text-foreground"
               title={t("task.cancel")}
             >
               <XIcon className="h-3.5 w-3.5" />
@@ -144,7 +144,7 @@ function TaskItem({ task, onCancel, onRemove }: TaskItemProps) {
           {canRemove && (
             <button
               onClick={onRemove}
-              className="p-1 text-muted transition-colors hover:text-foreground"
+              className="p-1 text-muted-foreground transition-colors hover:text-foreground"
               title={t("common.delete")}
             >
               <XIcon className="h-3.5 w-3.5" />
@@ -171,7 +171,7 @@ function StatusBadge({ status }: StatusBadgeProps) {
   const statusConfig: Record<TaskStatus, { label: string; className: string }> = {
     pending: {
       label: t("task.status.pending"),
-      className: "bg-muted/30 text-muted",
+      className: "bg-muted/30 text-muted-foreground",
     },
     running: {
       label: t("task.status.running"),

@@ -68,7 +68,7 @@ export function Dialog({ open, onClose, title, children, footer, size = "md" }: 
           </h2>
           <button
             onClick={onClose}
-            className="flex h-6 w-6 items-center justify-center text-muted transition-colors hover:text-foreground"
+            className="flex h-6 w-6 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M18 6L6 18M6 6l12 12" />

@@ -39,6 +39,11 @@ export const PERMISSIONS = {
   EMBEDDING_VIEW: "embedding:view",
   EMBEDDING_MANAGE: "embedding:manage",
   EMBEDDING_SEARCH: "embedding:search",
+
+  // Chat permissions
+  CHAT_ACCESS: "chat:access",
+  CHAT_CREATE: "chat:create",
+  CHAT_DELETE: "chat:delete",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

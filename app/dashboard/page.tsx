@@ -28,7 +28,7 @@ export default function DashboardPage() {
     <div className="min-h-screen p-8">
       {/* Header */}
       <header className="mb-12 opacity-0 animate-fade-in">
-        <p className="font-mono text-[10px] uppercase tracking-widest text-muted">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
           {greeting}
         </p>
         <h1 className="mt-2 font-mono text-2xl font-medium tracking-tight">
@@ -39,11 +39,11 @@ export default function DashboardPage() {
       {/* Stats Grid */}
       <section className="mb-12">
         <div className="mb-6 flex items-center justify-between opacity-0 animate-fade-in delay-100">
-          <h2 className="font-mono text-[10px] font-medium uppercase tracking-widest text-muted">
+          <h2 className="font-mono text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
             {t("dashboard.overview")}
           </h2>
           <div className="h-px flex-1 bg-border mx-4" />
-          <span className="font-mono text-[10px] text-muted">
+          <span className="font-mono text-[10px] text-muted-foreground">
             {new Date().toLocaleDateString(dateLocale, {
               year: "numeric",
               month: "short",
@@ -59,7 +59,7 @@ export default function DashboardPage() {
               className="group border border-border bg-card p-6 transition-colors hover:border-foreground/20 opacity-0 animate-fade-in"
               style={{ animationDelay: `${150 + index * 50}ms` }}
             >
-              <p className="font-mono text-[10px] uppercase tracking-widest text-muted">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                 {stat.label}
               </p>
               <div className="mt-4 flex items-end justify-between">
@@ -67,7 +67,7 @@ export default function DashboardPage() {
                   {stat.value}
                 </span>
                 {stat.change && (
-                  <span className="font-mono text-[10px] text-muted">
+                  <span className="font-mono text-[10px] text-muted-foreground">
                     {stat.change}
                   </span>
                 )}
@@ -80,7 +80,7 @@ export default function DashboardPage() {
       {/* Quick Actions */}
       <section className="mb-12">
         <div className="mb-6 flex items-center opacity-0 animate-fade-in delay-300">
-          <h2 className="font-mono text-[10px] font-medium uppercase tracking-widest text-muted">
+          <h2 className="font-mono text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
             {t("dashboard.quickActions")}
           </h2>
           <div className="h-px flex-1 bg-border mx-4" />
@@ -108,7 +108,7 @@ export default function DashboardPage() {
       {/* Recent Activity */}
       <section>
         <div className="mb-6 flex items-center opacity-0 animate-fade-in delay-400">
-          <h2 className="font-mono text-[10px] font-medium uppercase tracking-widest text-muted">
+          <h2 className="font-mono text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
             {t("dashboard.recentActivity")}
           </h2>
           <div className="h-px flex-1 bg-border mx-4" />
@@ -120,7 +120,7 @@ export default function DashboardPage() {
               <div className="h-2 w-2 rounded-full bg-emerald-500" />
               <div>
                 <p className="font-mono text-xs">{t("dashboard.sessionStarted")}</p>
-                <p className="font-mono text-[10px] text-muted">
+                <p className="font-mono text-[10px] text-muted-foreground">
                   {user?.last_login_at
                     ? new Date(user.last_login_at).toLocaleString(dateLocale)
                     : t("dashboard.justNow")}
@@ -133,7 +133,7 @@ export default function DashboardPage() {
               <div className="h-2 w-2 rounded-full bg-blue-500" />
               <div>
                 <p className="font-mono text-xs">{t("dashboard.systemInitialized")}</p>
-                <p className="font-mono text-[10px] text-muted">
+                <p className="font-mono text-[10px] text-muted-foreground">
                   {t("dashboard.welcomeToAxonBase")}
                 </p>
               </div>
@@ -146,7 +146,7 @@ export default function DashboardPage() {
       <div className="mt-16 flex items-center justify-center opacity-0 animate-fade-in delay-400">
         <div className="flex items-center gap-4">
           <div className="h-px w-8 bg-border" />
-          <span className="font-mono text-[10px] uppercase tracking-widest text-muted/50">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/50">
             AxonBase v1.0
           </span>
           <div className="h-px w-8 bg-border" />
@@ -171,10 +171,10 @@ function ActionCard({ title, description, href }: ActionCardProps) {
       <div className="flex items-start justify-between">
         <div>
           <h3 className="font-mono text-sm font-medium">{title}</h3>
-          <p className="mt-1 font-mono text-[10px] text-muted">{description}</p>
+          <p className="mt-1 font-mono text-[10px] text-muted-foreground">{description}</p>
         </div>
         <svg
-          className="h-4 w-4 text-muted transition-transform group-hover:translate-x-1 group-hover:text-foreground"
+          className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-foreground"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"

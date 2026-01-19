@@ -23,6 +23,9 @@ export const Permissions = {
   EMBEDDING_VIEW: "embedding:view",
   EMBEDDING_MANAGE: "embedding:manage",
   EMBEDDING_SEARCH: "embedding:search",
+  CHAT_ACCESS: "chat:access",
+  CHAT_CREATE: "chat:create",
+  CHAT_DELETE: "chat:delete",
 } as const;
 
 export type Permission = (typeof Permissions)[keyof typeof Permissions];
@@ -123,6 +126,18 @@ export const permissionsMeta: Record<
   [Permissions.EMBEDDING_SEARCH]: {
     i18nKey: "permissions.embedding.search",
     category: "embedding",
+  },
+  [Permissions.CHAT_ACCESS]: {
+    i18nKey: "permissions.chat.access",
+    category: "chat",
+  },
+  [Permissions.CHAT_CREATE]: {
+    i18nKey: "permissions.chat.create",
+    category: "chat",
+  },
+  [Permissions.CHAT_DELETE]: {
+    i18nKey: "permissions.chat.delete",
+    category: "chat",
   },
 };
 

@@ -212,7 +212,7 @@ export default function DocumentsPage() {
       <div className="flex h-full items-center justify-center p-8">
         <div className="text-center">
           <h2 className="font-mono text-lg font-medium text-red-500">{t("error.accessDenied")}</h2>
-          <p className="mt-2 font-mono text-sm text-muted">{t("error.noPermission")}</p>
+          <p className="mt-2 font-mono text-sm text-muted-foreground">{t("error.noPermission")}</p>
         </div>
       </div>
     );
@@ -636,7 +636,7 @@ export default function DocumentsPage() {
       <div className="mb-8">
         <button
           onClick={handleBack}
-          className="mb-4 flex items-center gap-2 font-mono text-sm text-muted hover:text-foreground"
+          className="mb-4 flex items-center gap-2 font-mono text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeftIcon className="h-3.5 w-3.5" />
           {t("common.back")}
@@ -644,7 +644,7 @@ export default function DocumentsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-mono text-xl font-medium">{knowledgeBase?.name || t("docs.title")}</h1>
-            <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted">
+            <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               {documents.length} {t("docs.document").toLowerCase()}(s)
             </p>
           </div>
@@ -694,7 +694,7 @@ export default function DocumentsPage() {
             className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors ${
               activeTab === "documents"
                 ? "bg-foreground text-background"
-                : "text-muted hover:text-foreground"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {t("docs.title")}
@@ -704,7 +704,7 @@ export default function DocumentsPage() {
             className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors ${
               activeTab === "crawl"
                 ? "bg-foreground text-background"
-                : "text-muted hover:text-foreground"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {t("crawl.jobs")}
@@ -743,36 +743,36 @@ export default function DocumentsPage() {
               </div>
             )}
             {!canDeleteDoc && <div />}
-            <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               {t("docs.docTitle")}
             </div>
-            <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               {t("docs.sourceUrl")}
             </div>
-            <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               {t("docs.wordCount")}
             </div>
-            <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               {t("docs.status")}
             </div>
-            <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               {t("embedding.status")}
             </div>
-            <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               {t("common.createdAt")}
             </div>
-            <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               {t("common.actions")}
             </div>
           </div>
 
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <span className="font-mono text-xs text-muted">{t("common.loading")}...</span>
+              <span className="font-mono text-xs text-muted-foreground">{t("common.loading")}...</span>
             </div>
           ) : documents.length === 0 ? (
             <div className="flex items-center justify-center py-12">
-              <span className="font-mono text-xs text-muted">{t("common.noData")}</span>
+              <span className="font-mono text-xs text-muted-foreground">{t("common.noData")}</span>
             </div>
           ) : (
             documents.map((doc) => (
@@ -795,17 +795,17 @@ export default function DocumentsPage() {
                 {doc.sourceUrl ? (
                   <button
                     onClick={() => window.open(doc.sourceUrl!, "_blank", "noopener,noreferrer")}
-                    className="inline-flex items-center gap-1 font-mono text-xs text-muted hover:text-blue-500 max-w-full"
+                    className="inline-flex items-center gap-1 font-mono text-xs text-muted-foreground hover:text-blue-500 max-w-full"
                     title={doc.sourceUrl}
                   >
                     <span className="truncate">{new URL(doc.sourceUrl).hostname}</span>
                     <ExternalLinkIcon className="h-3 w-3 shrink-0" />
                   </button>
                 ) : (
-                  <span className="font-mono text-xs text-muted">-</span>
+                  <span className="font-mono text-xs text-muted-foreground">-</span>
                 )}
               </div>
-              <div className="font-mono text-sm text-muted">
+              <div className="font-mono text-sm text-muted-foreground">
                 {doc.wordCount}
               </div>
               <div>
@@ -815,7 +815,7 @@ export default function DocumentsPage() {
               </div>
               <div>
                 {doc.embeddingStatus === "pending" && (
-                  <span className="inline-block border border-border bg-muted/20 px-2 py-0.5 font-mono text-[10px] uppercase text-muted">
+                  <span className="inline-block border border-border bg-muted/20 px-2 py-0.5 font-mono text-[10px] uppercase text-muted-foreground">
                     {t("embedding.pending")}
                   </span>
                 )}
@@ -841,13 +841,13 @@ export default function DocumentsPage() {
                   </span>
                 )}
               </div>
-              <div className="font-mono text-xs text-muted">
+              <div className="font-mono text-xs text-muted-foreground">
                 {new Date(doc.createdAt).toLocaleDateString()}
               </div>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => openPreviewDialog(doc)}
-                  className="flex h-7 w-7 items-center justify-center text-muted hover:text-foreground"
+                  className="flex h-7 w-7 items-center justify-center text-muted-foreground hover:text-foreground"
                   title={t("common.preview")}
                 >
                   <EyeIcon className="h-3.5 w-3.5" />
@@ -855,7 +855,7 @@ export default function DocumentsPage() {
                 {canUpdateDoc && (
                   <button
                     onClick={() => openEditDialog(doc)}
-                    className="flex h-7 w-7 items-center justify-center text-muted hover:text-foreground"
+                    className="flex h-7 w-7 items-center justify-center text-muted-foreground hover:text-foreground"
                     title={t("common.edit")}
                   >
                     <EditIcon className="h-3.5 w-3.5" />
@@ -864,7 +864,7 @@ export default function DocumentsPage() {
                 {canDeleteDoc && (
                   <button
                     onClick={() => openDeleteDialog(doc)}
-                    className="flex h-7 w-7 items-center justify-center text-muted hover:text-red-500"
+                    className="flex h-7 w-7 items-center justify-center text-muted-foreground hover:text-red-500"
                     title={t("common.delete")}
                   >
                     <TrashIcon className="h-3.5 w-3.5" />
@@ -873,7 +873,7 @@ export default function DocumentsPage() {
                 {doc.embeddingStatus === "completed" && (
                   <button
                     onClick={() => openTestDialog(doc)}
-                    className="flex h-7 w-7 items-center justify-center text-muted hover:text-purple-500"
+                    className="flex h-7 w-7 items-center justify-center text-muted-foreground hover:text-purple-500"
                     title={t("docTest.test")}
                   >
                     <ChatIcon className="h-3.5 w-3.5" />
@@ -884,14 +884,14 @@ export default function DocumentsPage() {
                     {embeddingLoading.get(doc.id) ? (
                       <button
                         disabled
-                        className="flex h-7 w-7 items-center justify-center text-muted"
+                        className="flex h-7 w-7 items-center justify-center text-muted-foreground"
                       >
                         <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
                       </button>
                     ) : doc.embeddingStatus === "completed" ? (
                       <button
                         onClick={() => handleDeleteEmbedding(doc.id)}
-                        className="flex h-7 w-7 items-center justify-center text-muted hover:text-red-500"
+                        className="flex h-7 w-7 items-center justify-center text-muted-foreground hover:text-red-500"
                         title={t("embedding.deleteEmbedding")}
                       >
                         <TrashEmbeddingIcon className="h-3.5 w-3.5" />
@@ -899,7 +899,7 @@ export default function DocumentsPage() {
                     ) : (
                       <button
                         onClick={() => handleEmbed(doc.id)}
-                        className="flex h-7 w-7 items-center justify-center text-muted hover:text-blue-500"
+                        className="flex h-7 w-7 items-center justify-center text-muted-foreground hover:text-blue-500"
                         title={t("embedding.embed")}
                         disabled={doc.embeddingStatus === "processing"}
                       >
@@ -916,7 +916,7 @@ export default function DocumentsPage() {
         
         {totalPages > 1 && (
           <div className="mt-4 flex items-center justify-between border border-border bg-card px-4 py-3">
-            <div className="font-mono text-xs text-muted">
+            <div className="font-mono text-xs text-muted-foreground">
               {t("pagination.showing")
                 .replace("{from}", String((currentPage - 1) * pageSize + 1))
                 .replace("{to}", String(Math.min(currentPage * pageSize, totalDocs)))
@@ -942,7 +942,7 @@ export default function DocumentsPage() {
               <div className="flex items-center gap-1 px-2">
                 {generatePageNumbers(currentPage, totalPages).map((pageNum, idx) => (
                   pageNum === "..." ? (
-                    <span key={`ellipsis-${idx}`} className="px-1 font-mono text-xs text-muted">...</span>
+                    <span key={`ellipsis-${idx}`} className="px-1 font-mono text-xs text-muted-foreground">...</span>
                   ) : (
                     <button
                       key={pageNum}
@@ -1014,7 +1014,7 @@ export default function DocumentsPage() {
             required
           />
           <div className="flex flex-1 flex-col overflow-hidden">
-            <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-widest text-muted">
+            <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               {t("docs.content")}
             </label>
             <div className="flex-1">
@@ -1054,7 +1054,7 @@ export default function DocumentsPage() {
             required
           />
           <div className="flex flex-1 flex-col overflow-hidden">
-            <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-widest text-muted">
+            <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               {t("docs.content")}
             </label>
             <div className="flex-1">
@@ -1087,7 +1087,7 @@ export default function DocumentsPage() {
       >
         <div className="space-y-4">
           <p className="font-mono text-sm">{t("docs.confirmDelete")}</p>
-          <p className="font-mono text-sm text-muted">
+          <p className="font-mono text-sm text-muted-foreground">
             {t("docs.docTitle")}: <strong>{selectedDoc?.title}</strong>
           </p>
           {formError && (
@@ -1113,7 +1113,7 @@ export default function DocumentsPage() {
       >
         <div className="space-y-4">
           <p className="font-mono text-sm">{t("docs.confirmBatchDelete")}</p>
-          <p className="font-mono text-sm text-muted">
+          <p className="font-mono text-sm text-muted-foreground">
             {t("docs.selectedCount")}: <strong>{selectedDocIds.size}</strong>
           </p>
           {formError && (
@@ -1135,10 +1135,10 @@ export default function DocumentsPage() {
       >
         <div className="flex h-full flex-col">
           <div className="mb-3 flex items-center gap-4 border-b border-border pb-2 shrink-0">
-            <span className="font-mono text-[10px] uppercase tracking-widest text-muted">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               {t("docs.wordCount")}: {selectedDoc?.wordCount}
             </span>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-muted">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               {t("docs.status")}: {selectedDoc?.status}
             </span>
           </div>
@@ -1190,7 +1190,7 @@ export default function DocumentsPage() {
               <>
                 {testResult.debug && (
                   <div className="border border-border bg-card/50 p-4">
-                    <div className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted">
+                    <div className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                       {t("docTest.ragPipeline")}
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -1218,7 +1218,7 @@ export default function DocumentsPage() {
                           : undefined}
                       />
                     </div>
-                    <div className="mt-3 flex gap-4 text-[10px] text-muted">
+                    <div className="mt-3 flex gap-4 text-[10px] text-muted-foreground">
                       <span>{t("docTest.embeddingModel")}: {testResult.debug.embeddingModel}</span>
                       {testResult.debug.rerankerProvider && (
                         <span>{t("docTest.rerankerModel")}: {testResult.debug.rerankerProvider}</span>
@@ -1229,7 +1229,7 @@ export default function DocumentsPage() {
 
                 <div className="border border-border bg-card p-4">
                   <div className="mb-2 flex items-center justify-between">
-                    <span className="font-mono text-[10px] uppercase tracking-widest text-muted">
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                       {t("docTest.aiAnswer")}
                       {testLoading && (
                         <span className="ml-2 inline-flex items-center gap-1 text-blue-500">
@@ -1239,7 +1239,7 @@ export default function DocumentsPage() {
                       )}
                     </span>
                     {testResult.responseTime && (
-                      <span className="font-mono text-[10px] text-muted">
+                      <span className="font-mono text-[10px] text-muted-foreground">
                         {testResult.responseTime}ms
                       </span>
                     )}
@@ -1251,7 +1251,7 @@ export default function DocumentsPage() {
                     )}
                   </div>
                   {testResult.usage && (
-                    <div className="mt-2 flex gap-4 text-[10px] text-muted">
+                    <div className="mt-2 flex gap-4 text-[10px] text-muted-foreground">
                       {testResult.usage.inputTokens && (
                         <span>{t("settings.inputTokens")}: {testResult.usage.inputTokens}</span>
                       )}
@@ -1265,7 +1265,7 @@ export default function DocumentsPage() {
                 {testResult.chunks.length > 0 && (
                   <div className="border border-border">
                     <div className="border-b border-border bg-card/50 px-4 py-2">
-                      <span className="font-mono text-[10px] uppercase tracking-widest text-muted">
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                         {t("docTest.matchedChunks")} ({testResult.chunks.length})
                       </span>
                     </div>
@@ -1274,7 +1274,7 @@ export default function DocumentsPage() {
                         <div key={chunk.chunkId} className="p-4">
                           <div className="mb-2 flex items-center justify-between flex-wrap gap-2">
                             <div className="flex items-center gap-2">
-                              <span className="font-mono text-[10px] text-muted">
+                              <span className="font-mono text-[10px] text-muted-foreground">
                                 {t("docTest.fragment")} #{index + 1}
                               </span>
                               <SearchTypeBadge type={chunk.searchType} t={t} />
@@ -1295,7 +1295,7 @@ export default function DocumentsPage() {
                                   ? "border-green-500/50 bg-green-500/10 text-green-500"
                                   : chunk.combinedScore >= 0.02
                                   ? "border-yellow-500/50 bg-yellow-500/10 text-yellow-500"
-                                  : "border-border bg-muted/10 text-muted"
+                                  : "border-border bg-muted/10 text-muted-foreground"
                               }`}>
                                 {t("docTest.score")}: {chunk.combinedScore.toFixed(4)}
                               </span>
@@ -1311,7 +1311,7 @@ export default function DocumentsPage() {
                               </p>
                             </div>
                           )}
-                          <p className="font-mono text-xs text-muted whitespace-pre-wrap line-clamp-4">
+                          <p className="font-mono text-xs text-muted-foreground whitespace-pre-wrap line-clamp-4">
                             {chunk.content}
                           </p>
                         </div>
@@ -1322,7 +1322,7 @@ export default function DocumentsPage() {
 
                 {testResult.chunks.length === 0 && (
                   <div className="border border-border bg-card/50 p-4 text-center">
-                    <span className="font-mono text-xs text-muted">
+                    <span className="font-mono text-xs text-muted-foreground">
                       {t("docTest.noChunksFound")}
                     </span>
                   </div>
@@ -1332,7 +1332,7 @@ export default function DocumentsPage() {
 
             {!testResult && !testLoading && (
               <div className="flex h-full items-center justify-center">
-                <span className="font-mono text-xs text-muted">
+                <span className="font-mono text-xs text-muted-foreground">
                   {t("docTest.enterQueryHint")}
                 </span>
               </div>
@@ -1340,7 +1340,7 @@ export default function DocumentsPage() {
 
             {testLoading && (
               <div className="flex h-full items-center justify-center">
-                <SpinnerIcon className="h-6 w-6 animate-spin text-muted" />
+                <SpinnerIcon className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             )}
           </div>
@@ -1547,7 +1547,7 @@ function PipelineStep({ label, active, icon, detail }: PipelineStepProps) {
     <div className={`flex items-center gap-2 px-3 py-2 border font-mono text-[10px] ${
       active
         ? "border-green-500/50 bg-green-500/10 text-green-400"
-        : "border-border bg-muted/10 text-muted"
+        : "border-border bg-muted/10 text-muted-foreground"
     }`}>
       {icon}
       <span className="uppercase tracking-wider">{label}</span>
@@ -1559,7 +1559,7 @@ function PipelineStep({ label, active, icon, detail }: PipelineStepProps) {
 
 function PipelineArrow() {
   return (
-    <svg className="h-3 w-3 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg className="h-3 w-3 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M5 12h14M12 5l7 7-7 7" />
     </svg>
   );

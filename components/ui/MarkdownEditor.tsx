@@ -38,7 +38,7 @@ export function MarkdownEditor({
     <div className="h-full w-full overflow-hidden border border-border">
       {!isReady && (
         <div className="flex h-full items-center justify-center">
-          <span className="font-mono text-xs text-muted">Loading editor...</span>
+          <span className="font-mono text-xs text-muted-foreground">Loading editor...</span>
         </div>
       )}
       <Editor

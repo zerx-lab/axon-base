@@ -105,7 +105,7 @@ export default function RolesPage() {
       <div className="flex h-full items-center justify-center p-8">
         <div className="text-center">
           <h2 className="font-mono text-lg font-medium text-red-500">{t("error.accessDenied")}</h2>
-          <p className="mt-2 font-mono text-sm text-muted">{t("error.noPermission")}</p>
+          <p className="mt-2 font-mono text-sm text-muted-foreground">{t("error.noPermission")}</p>
         </div>
       </div>
     );
@@ -253,7 +253,7 @@ export default function RolesPage() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="font-mono text-xl font-medium">{t("roles.title")}</h1>
-          <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted">
+          <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {roles.length} {t("common.role").toLowerCase()}(s)
           </p>
         </div>
@@ -268,7 +268,7 @@ export default function RolesPage() {
       {/* Roles Grid */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <span className="font-mono text-xs text-muted">{t("common.loading")}...</span>
+          <span className="font-mono text-xs text-muted-foreground">{t("common.loading")}...</span>
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -280,12 +280,12 @@ export default function RolesPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-mono text-sm font-medium">{role.name}</h3>
-                  <p className="mt-1 font-mono text-[10px] text-muted">
+                  <p className="mt-1 font-mono text-[10px] text-muted-foreground">
                     {role.description || "-"}
                   </p>
                 </div>
                 {role.is_system ? (
-                  <span className="inline-block border border-border px-2 py-0.5 font-mono text-[10px] uppercase text-muted">
+                  <span className="inline-block border border-border px-2 py-0.5 font-mono text-[10px] uppercase text-muted-foreground">
                     {t("roles.systemRole")}
                   </span>
                 ) : (
@@ -296,7 +296,7 @@ export default function RolesPage() {
               </div>
 
               <div className="mt-4">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-muted">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                   {t("roles.permissions")} ({role.permissions.length})
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1">
@@ -309,7 +309,7 @@ export default function RolesPage() {
                     </span>
                   ))}
                   {role.permissions.length > 5 && (
-                    <span className="inline-block bg-foreground/5 px-1.5 py-0.5 font-mono text-[9px] text-muted">
+                    <span className="inline-block bg-foreground/5 px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
                       +{role.permissions.length - 5}
                     </span>
                   )}
@@ -320,7 +320,7 @@ export default function RolesPage() {
                 {canUpdateRole && (
                   <button
                     onClick={() => openEditDialog(role)}
-                    className="flex h-7 w-7 items-center justify-center text-muted hover:text-foreground"
+                    className="flex h-7 w-7 items-center justify-center text-muted-foreground hover:text-foreground"
                     title={t("common.edit")}
                   >
                     <EditIcon className="h-3.5 w-3.5" />
@@ -329,7 +329,7 @@ export default function RolesPage() {
                 {canDeleteRole && !role.is_system && (
                   <button
                     onClick={() => openDeleteDialog(role)}
-                    className="flex h-7 w-7 items-center justify-center text-muted hover:text-red-500"
+                    className="flex h-7 w-7 items-center justify-center text-muted-foreground hover:text-red-500"
                     title={t("common.delete")}
                   >
                     <TrashIcon className="h-3.5 w-3.5" />
@@ -375,13 +375,13 @@ export default function RolesPage() {
 
           {/* Permissions */}
           <div className="space-y-3">
-            <label className="block font-mono text-[10px] uppercase tracking-widest text-muted">
+            <label className="block font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               {t("roles.permissions")}
             </label>
             <div className="max-h-60 overflow-y-auto border border-border p-3">
               {Object.entries(permissionsByCategory).map(([category, perms]) => (
                 <div key={category} className="mb-4 last:mb-0">
-                  <h4 className="mb-2 font-mono text-[10px] font-medium uppercase tracking-widest text-muted">
+                  <h4 className="mb-2 font-mono text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
                     {t(`permission.category.${category}`)}
                   </h4>
                   <div className="space-y-1.5">
@@ -427,7 +427,7 @@ export default function RolesPage() {
       >
         <div className="space-y-4">
           <p className="font-mono text-sm">{t("roles.confirmDelete")}</p>
-          <p className="font-mono text-sm text-muted">
+          <p className="font-mono text-sm text-muted-foreground">
             {t("roles.name")}: <strong>{selectedRole?.name}</strong>
           </p>
           {formError && <p className="font-mono text-xs text-red-500">{formError}</p>}

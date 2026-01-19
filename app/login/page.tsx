@@ -65,7 +65,7 @@ export default function LoginPage() {
               Ax
             </span>
           </div>
-          <h1 className="font-mono text-xs font-medium uppercase tracking-[0.3em] text-muted">
+          <h1 className="font-mono text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground">
             AxonBase
           </h1>
         </div>
@@ -76,7 +76,7 @@ export default function LoginPage() {
             <div className="group">
               <label
                 htmlFor="username"
-                className="mb-2 block font-mono text-[10px] font-medium uppercase tracking-widest text-muted transition-colors group-focus-within:text-foreground"
+                className="mb-2 block font-mono text-[10px] font-medium uppercase tracking-widest text-muted-foreground transition-colors group-focus-within:text-foreground"
               >
                 {t("auth.username")}
               </label>
@@ -85,7 +85,7 @@ export default function LoginPage() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="h-12 w-full border border-border bg-transparent px-4 font-mono text-sm text-foreground transition-colors placeholder:text-muted/50 hover:border-muted focus:border-foreground focus:outline-none"
+                className="h-12 w-full border border-border bg-transparent px-4 font-mono text-sm text-foreground transition-colors placeholder:text-muted-foreground/50 hover:border-muted focus:border-foreground focus:outline-none"
                 placeholder={t("auth.enterUsername")}
                 required
                 autoComplete="username"
@@ -95,7 +95,7 @@ export default function LoginPage() {
             <div className="group">
               <label
                 htmlFor="password"
-                className="mb-2 block font-mono text-[10px] font-medium uppercase tracking-widest text-muted transition-colors group-focus-within:text-foreground"
+                className="mb-2 block font-mono text-[10px] font-medium uppercase tracking-widest text-muted-foreground transition-colors group-focus-within:text-foreground"
               >
                 {t("auth.password")}
               </label>
@@ -104,7 +104,7 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="h-12 w-full border border-border bg-transparent px-4 font-mono text-sm text-foreground transition-colors placeholder:text-muted/50 hover:border-muted focus:border-foreground focus:outline-none"
+                className="h-12 w-full border border-border bg-transparent px-4 font-mono text-sm text-foreground transition-colors placeholder:text-muted-foreground/50 hover:border-muted focus:border-foreground focus:outline-none"
                 placeholder={t("auth.enterPassword")}
                 required
                 autoComplete="current-password"
@@ -140,7 +140,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <div className="mt-16 text-center opacity-0 animate-fade-in delay-300">
-          <p className="font-mono text-[10px] uppercase tracking-widest text-muted/50">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/50">
             {t("auth.securePortal")}
           </p>
         </div>
