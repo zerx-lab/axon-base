@@ -498,6 +498,20 @@ const translations: Translations = {
   "settings.detectedFormat": { zh: "检测到的格式", en: "Detected Format" },
   "settings.applyFormat": { zh: "应用此格式", en: "Apply Format" },
 
+  "settings.qualityControl": { zh: "重排质量控制", en: "Reranker Quality Control" },
+  "settings.qualityControlDesc": { zh: "根据重排模型的相关性评分动态控制返回结果数量，提升回答质量", en: "Dynamically control result quantity based on reranker relevance scores to improve answer quality" },
+  "settings.enableQualityControl": { zh: "启用质量控制", en: "Enable Quality Control" },
+  "settings.enableQualityControlDesc": { zh: "使用相关性阈值和得分下降检测来动态返回最佳质量的结果", en: "Use relevance thresholds and score cliff detection to dynamically return best quality results" },
+  "settings.minResults": { zh: "最少返回数", en: "Min Results" },
+  "settings.minResultsDesc": { zh: "保证至少返回的结果数量，确保用户总能得到答案", en: "Minimum results to return, guarantees user always gets an answer" },
+  "settings.maxResults": { zh: "最多返回数", en: "Max Results" },
+  "settings.maxResultsDesc": { zh: "最多返回的结果数量，防止过多的输入导致成本过高", en: "Maximum results to return, prevents excessive input and costs" },
+  "settings.scoreThreshold": { zh: "相关性阈值", en: "Score Threshold" },
+  "settings.scoreThresholdDesc": { zh: "相关性分数下限 (0.0-1.0)，低于此值的结果不返回", en: "Minimum relevance score (0.0-1.0), scores below this are not returned" },
+  "settings.dropoffThreshold": { zh: "得分断崖", en: "Score Dropoff" },
+  "settings.dropoffThresholdDesc": { zh: "相邻结果得分下降超过此值则停止返回，用于识别质量明显下降的边界", en: "Stop returning if score drops more than this between items, detects quality cliff" },
+  "settings.qualityControlPreview": { zh: "质量控制行为预览", en: "Quality Control Behavior Preview" },
+
   // Permission names (Embedding)
   "permission.category.embedding": { zh: "向量化管理", en: "Embedding Management" },
   "permission.embedding.view": { zh: "查看向量化状态", en: "View Embedding Status" },

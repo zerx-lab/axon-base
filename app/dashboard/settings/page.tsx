@@ -1678,20 +1678,20 @@ export default function SettingsPage() {
 
                     <div className="rounded border border-blue-500/30 bg-blue-500/5 p-4">
                       <div className="font-mono text-xs font-medium text-blue-500 mb-2">
-                        {t("settings.qualityControlPreview") || "Quality Control Behavior"}
+                        {t("settings.qualityControlPreview")}
                       </div>
                       <div className="space-y-1 font-mono text-[10px] text-muted-foreground">
                         <div>
-                          • {t("settings.preview1") || `Return at least ${qualityConfig.minResults} result(s)`}
+                          • {t("settings.minResults")}: {qualityConfig.minResults}
                         </div>
                         <div>
-                          • {t("settings.preview2") || `Return at most ${qualityConfig.maxResults} result(s)`}
+                          • {t("settings.maxResults")}: {qualityConfig.maxResults}
                         </div>
                         <div>
-                          • {t("settings.preview3") || `Stop if score < ${qualityConfig.scoreThreshold.toFixed(2)}`}
+                          • {t("settings.scoreThreshold")}: {qualityConfig.scoreThreshold.toFixed(2)}
                         </div>
                         <div>
-                          • {t("settings.preview4") || `Stop if score drops > ${qualityConfig.dropoffThreshold.toFixed(2)} between items`}
+                          • {t("settings.dropoffThreshold")}: {qualityConfig.dropoffThreshold.toFixed(2)}
                         </div>
                       </div>
                     </div>
