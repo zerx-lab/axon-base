@@ -18,8 +18,8 @@ RUN apt-get update && apt-get install -y \
 # 安装 uv (快速 Python 包管理器)
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 将 uv 加入 PATH
-ENV PATH="/root/.cargo/bin:$PATH"
+# 将 uv 加入 PATH (uv 安装在 /root/.local/bin)
+ENV PATH="/root/.local/bin:$PATH"
 
 # 复制项目文件
 COPY pyproject.toml uv.lock* ./
