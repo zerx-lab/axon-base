@@ -10,7 +10,7 @@ import type { ChatConfig, ChatMessageMetadata, Json, HybridSearchChunk, Reranker
 import { DEFAULT_PROMPTS } from "@/lib/supabase/types";
 import { generateSingleEmbedding, hybridSearchChunksMultiKb, getEmbeddingConfig } from "@/lib/embeddings";
 import { hybridSearchWithReranking } from "@/lib/reranker";
-import { extractErrorMessage } from "@/lib/error-extractor";
+import { extractErrorMessage, extractDetailedError } from "@/lib/error-extractor";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -228,70 +228,35 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .eq("id", assistantMessage.id);
 
      const model = createProvider(chatConfig);
-     let streamError: Error | null = null;
+     let capturedError: unknown = null;
 
      const result = streamText({
-       model,
-       messages,
-       maxOutputTokens: chatConfig.maxTokens || 2048,
-       temperature: chatConfig.temperature ?? 0.7,
-       onFinish: async ({ text, usage, finishReason }) => {
-         const metadata: ChatMessageMetadata = {
-           inputTokens: usage?.inputTokens,
-           outputTokens: usage?.outputTokens,
-           totalTokens: (usage?.inputTokens || 0) + (usage?.outputTokens || 0),
-           model: chatConfig.model,
-           finishReason,
-         };
+        model,
+        messages,
+        maxOutputTokens: chatConfig.maxTokens || 2048,
+        temperature: chatConfig.temperature ?? 0.7,
+        onFinish: async ({ text, usage, finishReason }) => {
+          const metadata: ChatMessageMetadata = {
+            inputTokens: usage?.inputTokens,
+            outputTokens: usage?.outputTokens,
+            totalTokens: (usage?.inputTokens || 0) + (usage?.outputTokens || 0),
+            model: chatConfig.model,
+            finishReason,
+          };
 
-         if (contextChunks.length > 0) {
-           metadata.references = contextChunks.map(chunk => ({
-             chunkId: chunk.chunk_id,
-             documentId: chunk.document_id,
-             documentTitle: chunk.document_title,
-             sourceUrl: chunk.document_source_url,
-             contextSummary: chunk.chunk_context,
-             content: chunk.chunk_content.substring(0, 300),
-             similarity: chunk.similarity,
-             chunkIndex: chunk.chunk_index,
-           }));
-         }
-
-         await supabase
-           .from("chat_messages")
-           .update({
-             content: text,
-             status: "completed" as const,
-             metadata: metadata as unknown as Json,
-           })
-           .eq("id", assistantMessage.id);
-       },
-       onError: async (error) => {
-         let errorMessage = "Unknown error";
-         
-         if (error instanceof Error) {
-           errorMessage = error.message;
-         } else if (typeof error === "object" && error !== null) {
-           const err = error as Record<string, unknown>;
-           if (err.error && typeof err.error === "object") {
-             const innerErr = err.error as Record<string, unknown>;
-             if (typeof innerErr.message === "string") {
-               errorMessage = innerErr.message;
-             } else {
-               errorMessage = JSON.stringify(err.error);
-             }
-           } else if (typeof err.message === "string") {
-             errorMessage = err.message;
-           } else {
-             errorMessage = JSON.stringify(error);
-           }
-         } else {
-           errorMessage = String(error);
-         }
-         
-         streamError = new Error(errorMessage);
-       },
-     });
+          await supabase
+            .from("chat_messages")
+            .update({
+              content: text,
+              status: "completed" as const,
+              metadata: metadata as unknown as Json,
+            })
+            .eq("id", assistantMessage.id);
+        },
+        onError: async (error) => {
+          capturedError = error;
+        },
+      });
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
@@ -313,41 +278,55 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           })}\n\n`));
         }
 
-        try {
-           for await (const chunk of result.textStream) {
-             if (streamError) {
-               throw streamError;
-             }
-             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "delta", content: chunk })}\n\n`));
-           }
+         try {
+            for await (const chunk of result.textStream) {
+              if (capturedError) {
+                throw capturedError;
+              }
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "delta", content: chunk })}\n\n`));
+            }
 
-           if (streamError) {
-             throw streamError;
-           }
+            if (capturedError) {
+              throw capturedError;
+            }
 
-           const usage = await result.usage;
-           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-             type: "done",
-             messageId: assistantMessage.id,
-             usage: {
-               inputTokens: usage?.inputTokens,
-               outputTokens: usage?.outputTokens,
-             }
-           })}\n\n`));
-          } catch (streamErrorCaught) {
-            const finalError = streamError || streamErrorCaught;
-            console.error("Stream error:", finalError);
-            const errorMessage = extractErrorMessage(finalError);
+            const usage = await result.usage;
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+              type: "done",
+              messageId: assistantMessage.id,
+              usage: {
+                inputTokens: usage?.inputTokens,
+                outputTokens: usage?.outputTokens,
+              }
+            })}\n\n`));
+           } catch (streamErrorCaught) {
+             const finalError = capturedError || streamErrorCaught;
+             const extracted = extractDetailedError(finalError);
+             
+             console.error("Stream error:", {
+               message: extracted.message,
+               code: extracted.code,
+               statusCode: extracted.statusCode,
+               details: extracted.details,
+             });
+             
+             const errorMessage = extracted.message;
 
-            await supabase
-              .from("chat_messages")
-              .update({
-                status: "failed" as const,
-                metadata: { error: errorMessage } as unknown as Json,
-              })
-              .eq("id", assistantMessage.id);
+             await supabase
+               .from("chat_messages")
+               .update({
+                 status: "failed" as const,
+                 metadata: { error: errorMessage, code: extracted.code } as unknown as Json,
+               })
+               .eq("id", assistantMessage.id);
 
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", error: errorMessage })}\n\n`));
+             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+               type: "error", 
+               error: errorMessage,
+               code: extracted.code,
+               statusCode: extracted.statusCode,
+               details: extracted.details,
+             })}\n\n`));
           }
 
         controller.close();

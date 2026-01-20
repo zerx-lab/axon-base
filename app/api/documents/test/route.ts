@@ -20,6 +20,7 @@ import {
   formatChunkContext,
   type Locale,
 } from "@/lib/i18n-server";
+import { extractDetailedError } from "@/lib/error-extractor";
 
 interface TestDocumentRequest {
   operatorId: string;
@@ -196,14 +197,25 @@ export async function POST(request: NextRequest) {
     };
 
     return await generateAnswer(supabase, query, chunksWithSimilarity, doc.title, locale, debug);
-  } catch (error) {
-    console.error("Document test error:", error);
-    const locale = parseLocale(undefined);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : t("api.docTest.testFailed", locale) },
-      { status: 500 }
-    );
-  }
+   } catch (error) {
+     const locale = parseLocale(undefined);
+     const extracted = extractDetailedError(error);
+     console.error("Document test error:", {
+       message: extracted.message,
+       code: extracted.code,
+       statusCode: extracted.statusCode,
+       details: extracted.details,
+     });
+     return NextResponse.json(
+       {
+         error: extracted.message,
+         code: extracted.code,
+         statusCode: extracted.statusCode,
+         details: extracted.details,
+       },
+       { status: extracted.statusCode || 500 }
+     );
+   }
 }
 
 async function generateAnswer(
@@ -295,14 +307,23 @@ async function generateAnswer(
       },
       debug,
     });
-  } catch (error) {
-    console.error("Chat generation error:", error);
-    return NextResponse.json({
-      success: true,
-      query,
-      chunks,
-      answer: `${t("api.docTest.generateFailed", locale)}: ${error instanceof Error ? error.message : "Unknown error"}`,
-      documentTitle,
-    });
-  }
+   } catch (error) {
+     const extracted = extractDetailedError(error);
+     console.error("Chat generation error:", {
+       message: extracted.message,
+       code: extracted.code,
+       statusCode: extracted.statusCode,
+       details: extracted.details,
+     });
+     return NextResponse.json({
+       success: true,
+       query,
+       chunks,
+       answer: `${t("api.docTest.generateFailed", locale)}: ${extracted.message}`,
+       code: extracted.code,
+       statusCode: extracted.statusCode,
+       details: extracted.details,
+       documentTitle,
+     });
+   }
 }

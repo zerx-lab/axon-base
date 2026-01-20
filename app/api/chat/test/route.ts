@@ -7,6 +7,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { ChatConfig } from "@/lib/supabase/types";
+import { extractDetailedError } from "@/lib/error-extractor";
 
 interface TestChatRequest {
   operatorId: string;
@@ -113,12 +114,23 @@ export async function POST(request: NextRequest) {
         finishReason: result.finishReason,
       },
     });
-  } catch (error) {
-    console.error("Test chat error:", error);
+   } catch (error) {
+     const errorDetails = extractDetailedError(error);
+     console.error("Test chat error:", {
+       message: errorDetails.message,
+       code: errorDetails.code,
+       statusCode: errorDetails.statusCode,
+       details: errorDetails.details,
+     });
 
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Test failed" },
-      { status: 500 }
-    );
-  }
+     return NextResponse.json(
+       {
+         error: errorDetails.message,
+         code: errorDetails.code,
+         statusCode: errorDetails.statusCode,
+         details: errorDetails.details,
+       },
+       { status: errorDetails.statusCode || 500 }
+     );
+   }
 }

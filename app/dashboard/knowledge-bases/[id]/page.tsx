@@ -292,6 +292,33 @@ export default function DocumentsPage() {
     setStreamingAnswer("");
   };
 
+  const formatErrorDisplay = (errorData: Record<string, unknown>): string => {
+    const parts: string[] = [];
+    
+    if (errorData.message) {
+      parts.push(String(errorData.message));
+    }
+    
+    if (errorData.code) {
+      parts.push(`[${errorData.code}]`);
+    }
+    
+    if (errorData.details) {
+      parts.push(`\n详情: ${errorData.details}`);
+    }
+    
+    if (errorData.originalError && errorData.code === "UNKNOWN_ERROR") {
+      parts.push(`\n原始错误: ${errorData.originalError}`);
+    }
+    
+    if (errorData.config) {
+      const config = errorData.config as Record<string, unknown>;
+      parts.push(`\n配置 - Provider: ${config.provider}, Model: ${config.model}`);
+    }
+    
+    return parts.join("");
+  };
+
   const openTestDialog = (doc: Document) => {
     setSelectedDoc(doc);
     setTestQuery("");
@@ -388,10 +415,13 @@ export default function DocumentsPage() {
                 setTestLoading(false);
                 break;
 
-              case "error":
-                setFormError(eventData.message || t("docTest.testFailed"));
-                setTestLoading(false);
-                break;
+               case "error":
+                 {
+                   const errorMessage = formatErrorDisplay(eventData);
+                   setFormError(errorMessage);
+                   setTestLoading(false);
+                 }
+                 break;
             }
           }
         }

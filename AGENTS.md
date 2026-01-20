@@ -5,6 +5,7 @@
 - **数据库操作**：通过 Next.js API Routes 与 Supabase 进行交互
 - **Supabase 操作规范**：执行任何 Supabase 相关操作前，必须先查阅 `.opencode/rules/` 目录下的对应规则文件
 - **Python 运行环境**：所有 Python 相关操作必须使用 **uv** 而非系统 Python，包括运行脚本、安装依赖、执行测试等
+- **任务文件保存**: 所有任务相关文件必须保存在 `tasks/` 目录下，禁止存放在其他位置
 
 ---
 
@@ -127,6 +128,8 @@ export function UserCard({ user, onSelect }: UserCardProps) {
 - 在 `globals.css` 中使用 `@theme inline` 定义 CSS 自定义属性
 
 ### 错误处理
+
+#### 基础错误处理规则
 - 使用显式错误检查，不要用 try-catch 控制流程
 - 抛出带有上下文的描述性错误
 - 在 API Routes 中返回适当的 HTTP 状态码
@@ -138,6 +141,84 @@ if (!user) {
   );
 }
 ```
+
+#### **关键：Vercel AI SDK 错误处理规范** ⚠️
+使用 Vercel AI SDK (`streamText`, `generateText`) 时，必须使用 `extractDetailedError()` 从 `lib/error-extractor.ts`：
+
+**问题症状**：
+- 错误消息显示 `"No output generated. Check the stream for errors."`
+- 日志中隐藏真实错误（如 `"The free tier of the model has been exhausted"`）
+- SSE 返回通用错误而不是具体的 API 错误
+
+**根本原因**：
+Vercel AI SDK 在捕获 HTTP 错误（如 403、429）时，将真实错误信息放在 Error 对象的 `responseBody` 字符串属性中：
+```javascript
+Error {
+  message: "No output generated...",  // 通用错误信息
+  responseBody: '{"error":{"message":"The free tier...","type":"AllocationQuota.FreeTierOnly","code":"AllocationQuota.FreeTierOnly"}}',  // 真实错误
+  statusCode: 403,
+  ...
+}
+```
+
+**解决方案**：
+1. 所有 AI 调用的 `catch` 块都必须使用 `extractDetailedError()`
+2. 流式调用必须在 `onError` 回调中捕获错误
+3. 流迭代过程中需要额外检查 `streamIterationError`
+
+**正确示例**：
+```typescript
+import { extractDetailedError } from "@/lib/error-extractor";
+
+// 非流式调用
+try {
+  const result = await generateText({ model, prompt, ... });
+} catch (error) {
+  const extracted = extractDetailedError(error);  // ✅ 提取真实错误
+  console.error("Real error:", extracted.message);
+  return NextResponse.json({
+    error: extracted.message,
+    code: extracted.code,
+    statusCode: extracted.statusCode,
+  }, { status: extracted.statusCode || 500 });
+}
+
+// 流式调用 - 关键：直接捕获原始错误，在 catch 块中提取
+let capturedError: unknown = null;
+const result = streamText({
+  model,
+  onError: (error) => {
+    capturedError = error;  // 直接保存原始错误对象
+  },
+});
+
+try {
+  for await (const chunk of result.textStream) {
+    if (capturedError) throw capturedError;  // 抛出原始错误对象
+    // 处理 chunk
+  }
+  if (capturedError) throw capturedError;
+} catch (streamError) {
+  const extracted = extractDetailedError(streamError);  // 在这里提取真实错误
+  // 使用 extracted.message 等字段
+}
+```
+
+**应用到的文件**：
+- `app/api/chat/sessions/[id]/messages/route.ts`
+- `app/api/chat/sessions/[id]/messages/regenerate/route.ts`
+- `app/api/documents/test/stream/route.ts`
+- `app/api/documents/test/route.ts`
+- `app/api/chat/test/route.ts`
+- `app/api/assistant-chat/route.ts` (如果有 AI 调用)
+
+**关键实现细节**：
+- 使用 `lib/error-extractor.ts` 中的 `extractDetailedError()` 提取真实错误
+- 流式调用中在 `onError` 回调**直接保存原始错误对象**而不是转换为 Error（防止 `[object Object]` 问题）
+- `ensureString()` 辅助函数确保所有字段值转换为有效字符串
+- 所有错误响应都包含 `code`、`statusCode`、`details` 字段用于诊断
+- 服务器日志记录原始错误对象以便深度调试
+- **关键**: Vercel AI SDK 的 `onError` 回调接收的 error 对象可能有对象类型的 message 属性，必须保存原始对象然后在 catch 块中使用 `extractDetailedError()` 提取
 
 ### 多语言 (i18n)
 - 所有用户可见文本必须使用 `lib/i18n.tsx` 的翻译系统

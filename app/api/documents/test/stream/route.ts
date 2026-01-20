@@ -20,6 +20,7 @@ import {
   formatChunkContext,
   type Locale,
 } from "@/lib/i18n-server";
+import { extractDetailedError, type ExtractedError } from "@/lib/error-extractor";
 
 interface TestDocumentRequest {
   operatorId: string;
@@ -53,6 +54,8 @@ interface DebugInfo {
   embeddingModel: string;
   resultTypes: Record<string, number>;
 }
+
+
 
 function createChatProvider(config: ChatConfig) {
   const { provider, baseUrl, apiKey, model } = config;
@@ -300,32 +303,91 @@ async function streamAnswer(
       try {
         const model = createChatProvider(chatConfig);
 
+        let hasOutput = false;
+        let capturedError: unknown = null;
+        
         const result = streamText({
           model,
           system: systemPrompt,
           prompt: query,
           maxOutputTokens: chatConfig.maxTokens || 1024,
           temperature: chatConfig.temperature ?? 0.3,
-        });
-
-        for await (const textPart of result.textStream) {
-          await sendEvent("text", { content: textPart });
-        }
-
-        const usage = await result.usage;
-        const responseTime = Date.now() - startTime;
-
-        await sendEvent("done", {
-          responseTime,
-          usage: {
-            inputTokens: usage?.inputTokens,
-            outputTokens: usage?.outputTokens,
+          onError: (error) => {
+            capturedError = error;
           },
         });
+
+        try {
+          for await (const textPart of result.textStream) {
+            if (capturedError) {
+              throw capturedError;
+            }
+            hasOutput = true;
+            await sendEvent("text", { content: textPart });
+          }
+
+          if (capturedError) {
+            throw capturedError;
+          }
+
+          const usage = await result.usage;
+          const responseTime = Date.now() - startTime;
+
+          if (!hasOutput) {
+            await sendEvent("error", {
+              message: t("api.docTest.generateFailed", locale),
+              code: "NO_OUTPUT",
+              details: "AI模型没有生成任何输出。可能原因：1) 模型不可用 2) API密钥无效 3) 网络连接问题 4) 模型输出被过滤",
+              config: {
+                provider: chatConfig.provider,
+                model: chatConfig.model,
+                maxTokens: chatConfig.maxTokens || 1024,
+              },
+            });
+          } else {
+            await sendEvent("done", {
+              responseTime,
+              usage: {
+                inputTokens: usage?.inputTokens,
+                outputTokens: usage?.outputTokens,
+              },
+            });
+          }
+        } catch (streamError) {
+          const extracted = extractDetailedError(streamError);
+          
+          console.error("Stream generation error:", {
+            message: extracted.message,
+            code: extracted.code,
+            statusCode: extracted.statusCode,
+            details: extracted.details,
+          });
+          
+          await sendEvent("error", {
+            message: `${t("api.docTest.generateFailed", locale)}: ${extracted.message}`,
+            code: extracted.code,
+            statusCode: extracted.statusCode,
+            details: extracted.details,
+            config: {
+              provider: chatConfig.provider,
+              model: chatConfig.model,
+              baseUrl: chatConfig.baseUrl || "default",
+              maxTokens: chatConfig.maxTokens || 1024,
+            },
+          });
+        }
       } catch (error) {
-        console.error("Stream generation error:", error);
+        console.error("Chat provider creation error:", error);
+        const extracted = extractDetailedError(error);
         await sendEvent("error", {
-          message: `${t("api.docTest.generateFailed", locale)}: ${error instanceof Error ? error.message : "Unknown error"}`,
+          message: `${t("api.docTest.generateFailed", locale)}: ${extracted.message}`,
+          code: extracted.code,
+          statusCode: extracted.statusCode,
+          details: extracted.details,
+          config: {
+            provider: chatConfig.provider,
+            model: chatConfig.model,
+          },
         });
       }
     } catch (error) {
