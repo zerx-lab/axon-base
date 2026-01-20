@@ -40,8 +40,9 @@ generate_secrets() {
     POSTGRES_PASSWORD=$(openssl rand -base64 24 | tr -d '/+=')
     JWT_SECRET=$(openssl rand -hex 32)
     SECRET_KEY_BASE=$(openssl rand -base64 48 | tr -d '/+=')
-    VAULT_ENC_KEY=$(openssl rand -base64 24 | tr -d '/+=' | cut -c1-32)
-    PG_META_CRYPTO_KEY=$(openssl rand -base64 24 | tr -d '/+=' | cut -c1-32)
+    # AES-256-GCM requires exactly 32 bytes key
+    VAULT_ENC_KEY=$(openssl rand -base64 32 | tr -d '/+=' | head -c 32)
+    PG_META_CRYPTO_KEY=$(openssl rand -base64 32 | tr -d '/+=' | head -c 32)
     LOGFLARE_PUBLIC_TOKEN=$(openssl rand -hex 16)
     LOGFLARE_PRIVATE_TOKEN=$(openssl rand -hex 24)
     
