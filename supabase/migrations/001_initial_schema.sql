@@ -5,9 +5,13 @@
 -- EXTENSIONS
 -- ============================================
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-CREATE EXTENSION IF NOT EXISTS vector;
+-- Use extensions schema for Supabase compatibility
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
+
+-- Add extensions to search path for this session
+SET search_path TO public, extensions;
 
 -- ============================================
 -- ROLES TABLE
