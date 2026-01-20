@@ -5,7 +5,8 @@ import logging
 import re
 from typing import Any
 
-from litellm import completion, get_model_info
+from litellm import completion, get_model_info, ModelResponse
+from litellm.types.utils import Choices
 
 from app.models import AnalysisResult, SiteConfig, FRAMEWORK_PRESETS
 from app.settings_loader import LLMSettings
@@ -15,6 +16,28 @@ logger = logging.getLogger(__name__)
 # Conservative token-to-char ratios for different content types
 # Chinese text uses more tokens per character than English
 TOKEN_CHAR_RATIO_CONSERVATIVE = 2.5  # ~2.5 chars per token for mixed content
+
+# Custom model token limits for models not in litellm's database
+# These are max INPUT tokens (context window minus output reservation)
+CUSTOM_MODEL_LIMITS: dict[str, int] = {
+    # Alibaba Qwen models (via OpenAI-compatible API)
+    "qwen-max": 30000,
+    "qwen-plus": 128000,
+    "qwen-turbo": 128000,
+    "qwen-long": 1000000,
+    # DeepSeek models
+    "deepseek-chat": 64000,
+    "deepseek-coder": 64000,
+    # Moonshot models
+    "moonshot-v1-8k": 8000,
+    "moonshot-v1-32k": 32000,
+    "moonshot-v1-128k": 128000,
+    # Zhipu models
+    "glm-4": 128000,
+    "glm-4-plus": 128000,
+    # Baichuan models
+    "baichuan2-turbo": 8000,
+}
 
 SYSTEM_PROMPT = """You are a web page structure analysis expert. Your task is to analyze HTML and identify the main content area and elements to exclude.
 
@@ -87,23 +110,35 @@ class PageAnalyzer:
     def _get_model_max_input_tokens(self) -> int:
         """Get max input tokens for the model, with fallback defaults."""
         default_limit = 8000  # Conservative default
+        model_name = self._model
+
+        # Extract base model name (remove provider prefix like "openai/")
+        base_model = model_name.split("/")[-1] if "/" in model_name else model_name
+
+        # Check custom model limits first (for models not in litellm)
+        if base_model in CUSTOM_MODEL_LIMITS:
+            limit = CUSTOM_MODEL_LIMITS[base_model]
+            logger.info(
+                f"Model {model_name} max_input_tokens: {limit} (from custom mapping)"
+            )
+            return limit
+
+        # Try litellm's model info
         try:
-            # litellm model format: "provider/model" or just "model"
-            model_name = self._model
             info = get_model_info(model_name)
             max_input = info.get("max_input_tokens") or info.get("max_tokens")
             if max_input is not None:
-                logger.info(f"Model {model_name} max_input_tokens: {max_input}")
+                logger.info(
+                    f"Model {model_name} max_input_tokens: {max_input} (from litellm)"
+                )
                 return int(max_input)
-            logger.warning(
-                f"No token limit found for {model_name}, using default {default_limit}"
-            )
-            return default_limit
         except Exception as e:
-            logger.warning(
-                f"Could not get model info for {self._model}: {e}, using default {default_limit}"
-            )
-            return default_limit
+            logger.debug(f"litellm.get_model_info failed for {model_name}: {e}")
+
+        logger.warning(
+            f"No token limit found for {model_name}, using default {default_limit}"
+        )
+        return default_limit
 
     def _calculate_max_html_chars(self) -> int:
         """Calculate max HTML chars based on model's token limit.
@@ -195,9 +230,21 @@ class PageAnalyzer:
             kwargs["api_base"] = self._api_base
 
         response = completion(**kwargs)
-        # litellm returns ModelResponse which has choices but type hints are incomplete
-        content: str = response.choices[0].message.content  # pyright: ignore[reportAttributeAccessIssue]
-        return content or ""
+
+        # Type guard: completion without stream=True returns ModelResponse
+        if not isinstance(response, ModelResponse):
+            raise TypeError(f"Expected ModelResponse, got {type(response)}")
+
+        if not response.choices:
+            return ""
+
+        choice = response.choices[0]
+        # Type guard: non-streaming response has Choices with message attribute
+        if not isinstance(choice, Choices):
+            raise TypeError(f"Expected Choices, got {type(choice)}")
+
+        content = choice.message.content
+        return content if content else ""
 
     def _parse_response(self, response: str) -> AnalysisResult:
         cleaned = response.strip()
