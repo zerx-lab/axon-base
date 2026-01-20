@@ -425,19 +425,41 @@ export function selectResultsWithQualityControl(
   return selected;
 }
 
+export interface HybridSearchWithRerankingResult {
+  chunks: HybridSearchChunk[];
+  reranked: boolean;
+  degraded: boolean;
+}
+
 export async function hybridSearchWithReranking(
   searchResults: HybridSearchChunk[],
   query: string,
   rerankerConfig: BaseRerankerConfig | null,
   topK: number = 20,
   qualityConfig?: RerankerQualityConfig
-): Promise<HybridSearchChunk[]> {
+): Promise<HybridSearchWithRerankingResult> {
+  // No reranker configured - use hybrid search results directly
   if (!rerankerConfig || !rerankerConfig.enabled) {
-    return searchResults.slice(0, topK);
+    const chunks = qualityConfig
+      ? selectResultsWithQualityControl(searchResults.slice(0, topK), qualityConfig)
+      : searchResults.slice(0, topK);
+    return {
+      chunks,
+      reranked: false,
+      degraded: false,
+    };
   }
 
+  // Provider explicitly set to none - passthrough mode
   if (rerankerConfig.provider === "none") {
-    return searchResults.slice(0, topK);
+    const chunks = qualityConfig
+      ? selectResultsWithQualityControl(searchResults.slice(0, topK), qualityConfig)
+      : searchResults.slice(0, topK);
+    return {
+      chunks,
+      reranked: false,
+      degraded: false,
+    };
   }
 
   const config: RerankerConfig = {
@@ -449,16 +471,34 @@ export async function hybridSearchWithReranking(
     customHeaders: rerankerConfig.customHeaders,
   };
 
-  const reranked = await rerankChunks(query, searchResults, config, { topK });
-  
-  const results = reranked.map(r => ({
-    ...r.chunk,
-    combined_score: r.relevanceScore,
-  }));
+  try {
+    const reranked = await rerankChunks(query, searchResults, config, { topK });
+    
+    const results = reranked.map(r => ({
+      ...r.chunk,
+      combined_score: r.relevanceScore,
+    }));
 
-  if (qualityConfig) {
-    return selectResultsWithQualityControl(results, qualityConfig);
+    const chunks = qualityConfig
+      ? selectResultsWithQualityControl(results, qualityConfig)
+      : results;
+
+    return {
+      chunks,
+      reranked: true,
+      degraded: false,
+    };
+  } catch (error) {
+    // Reranking failed - silently fallback to hybrid search results
+    // This ensures the search continues to work even if reranker service is unavailable
+    console.debug("Reranking failed, falling back to hybrid search results:", error);
+    const chunks = qualityConfig
+      ? selectResultsWithQualityControl(searchResults.slice(0, topK), qualityConfig)
+      : searchResults.slice(0, topK);
+    return {
+      chunks,
+      reranked: false,
+      degraded: true,
+    };
   }
-
-  return results;
 }

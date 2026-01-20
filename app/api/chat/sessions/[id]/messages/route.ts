@@ -201,6 +201,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       contextEnabled: false,
       hybridSearchUsed: false,
       rerankEnabled: false,
+      rerankDegraded: false,
       candidatesBeforeRerank: 0,
       rerankerProvider: null as string | null,
       resultTypes: null as Record<SearchType, number> | null,
@@ -274,13 +275,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         retrievalDebug.candidatesBeforeRerank = hybridResults.length;
         
         if (isRerankEnabled && hybridResults.length > 0) {
-          contextChunks = await hybridSearchWithReranking(
+          const rerankResult = await hybridSearchWithReranking(
             hybridResults,
             content,
             rerankerConfig,
             baseMatchCount,
             qualityConfig
           );
+          contextChunks = rerankResult.chunks;
+          retrievalDebug.rerankEnabled = rerankResult.reranked;
+          retrievalDebug.rerankDegraded = rerankResult.degraded;
         } else {
           contextChunks = hybridResults.slice(0, baseMatchCount);
         }
