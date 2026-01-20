@@ -8,11 +8,28 @@ FROM python:3.12-slim
 # 设置工作目录
 WORKDIR /app
 
-# 安装系统依赖
+# 安装系统依赖 (包括 Playwright 所需依赖)
 RUN apt-get update && apt-get install -y \
     curl \
     git \
     build-essential \
+    # Playwright dependencies
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libatspi2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # 安装 uv (快速 Python 包管理器)
@@ -26,6 +43,9 @@ COPY pyproject.toml uv.lock* ./
 
 # 使用 uv 创建虚拟环境并安装依赖
 RUN uv sync --frozen
+
+# 安装 Playwright 浏览器 (chromium)
+RUN uv run playwright install chromium
 
 # 复制应用代码
 COPY . .
