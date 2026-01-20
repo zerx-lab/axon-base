@@ -42,6 +42,14 @@ interface RerankerConfig {
   responseFormat: RerankerResponseFormat;
 }
 
+interface RerankerQualityConfig {
+  enabled: boolean;
+  minResults: number;
+  maxResults: number;
+  scoreThreshold: number;
+  dropoffThreshold: number;
+}
+
 const DEFAULT_CONFIG: EmbeddingConfig = {
   provider: "openai",
   baseUrl: "https://api.openai.com/v1",
@@ -108,6 +116,14 @@ const DEFAULT_RERANKER_CONFIG: RerankerConfig = {
   baseUrl: "",
   enabled: false,
   responseFormat: "auto",
+};
+
+const DEFAULT_QUALITY_CONFIG: RerankerQualityConfig = {
+  enabled: true,
+  minResults: 1,
+  maxResults: 10,
+  scoreThreshold: 0.6,
+  dropoffThreshold: 0.15,
 };
 
 const RERANKER_PROVIDER_PRESETS: Record<RerankerProvider, Partial<RerankerConfig>> = {
@@ -254,24 +270,30 @@ export default function SettingsPage() {
     formatConfidence: string;
     formatReason: string;
   } | null>(null);
-  const [rerankerTestError, setRerankerTestError] = useState<{ message: string; details?: Record<string, unknown> } | null>(null);
+   const [rerankerTestError, setRerankerTestError] = useState<{ message: string; details?: Record<string, unknown> } | null>(null);
 
-  const [promptConfig, setPromptConfig] = useState<PromptConfig>(DEFAULT_PROMPTS);
-  const [promptLoading, setPromptLoading] = useState(true);
-  const [promptSaving, setPromptSaving] = useState(false);
-  const [promptMessage, setPromptMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+   const [qualityConfig, setQualityConfig] = useState<RerankerQualityConfig>(DEFAULT_QUALITY_CONFIG);
+   const [qualityLoading, setQualityLoading] = useState(true);
+   const [qualitySaving, setQualitySaving] = useState(false);
+   const [qualityMessage, setQualityMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+   const [promptConfig, setPromptConfig] = useState<PromptConfig>(DEFAULT_PROMPTS);
+   const [promptLoading, setPromptLoading] = useState(true);
+   const [promptSaving, setPromptSaving] = useState(false);
+   const [promptMessage, setPromptMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const permissions = user?.permissions || [];
   const canEditSettings = permissions.includes(PERMISSIONS.SYSTEM_SETTINGS) || permissions.includes("*");
 
-  const fetchSettings = useCallback(async () => {
-    if (!user?.id) {
-      setLoading(false);
-      setChatLoading(false);
-      setRerankerLoading(false);
-      setPromptLoading(false);
-      return;
-    }
+   const fetchSettings = useCallback(async () => {
+     if (!user?.id) {
+       setLoading(false);
+       setChatLoading(false);
+       setRerankerLoading(false);
+       setQualityLoading(false);
+       setPromptLoading(false);
+       return;
+     }
     
     try {
       const embeddingParams = new URLSearchParams({
@@ -303,28 +325,40 @@ export default function SettingsPage() {
       const rerankerResponse = await fetch(`/api/settings?${rerankerParams}`);
       const rerankerResult = await rerankerResponse.json();
       
-      if (rerankerResult.setting?.value) {
-        setRerankerConfig({ ...DEFAULT_RERANKER_CONFIG, ...rerankerResult.setting.value });
-      }
+       if (rerankerResult.setting?.value) {
+         setRerankerConfig({ ...DEFAULT_RERANKER_CONFIG, ...rerankerResult.setting.value });
+       }
 
-      const promptParams = new URLSearchParams({
-        operatorId: user.id,
-        key: "prompt_config",
-      });
-      const promptResponse = await fetch(`/api/settings?${promptParams}`);
-      const promptResult = await promptResponse.json();
-      
-      if (promptResult.setting?.value) {
-        setPromptConfig({ ...DEFAULT_PROMPTS, ...promptResult.setting.value });
-      }
-    } catch (error) {
-      console.error("Failed to fetch settings:", error);
-    } finally {
-      setLoading(false);
-      setChatLoading(false);
-      setPromptLoading(false);
-      setRerankerLoading(false);
-    }
+       const qualityParams = new URLSearchParams({
+         operatorId: user.id,
+         key: "reranker_quality_config",
+       });
+       const qualityResponse = await fetch(`/api/settings?${qualityParams}`);
+       const qualityResult = await qualityResponse.json();
+       
+       if (qualityResult.setting?.value) {
+         setQualityConfig({ ...DEFAULT_QUALITY_CONFIG, ...qualityResult.setting.value });
+       }
+
+       const promptParams = new URLSearchParams({
+         operatorId: user.id,
+         key: "prompt_config",
+       });
+       const promptResponse = await fetch(`/api/settings?${promptParams}`);
+       const promptResult = await promptResponse.json();
+       
+       if (promptResult.setting?.value) {
+         setPromptConfig({ ...DEFAULT_PROMPTS, ...promptResult.setting.value });
+       }
+     } catch (error) {
+       console.error("Failed to fetch settings:", error);
+     } finally {
+       setLoading(false);
+       setChatLoading(false);
+       setQualityLoading(false);
+       setPromptLoading(false);
+       setRerankerLoading(false);
+     }
   }, [user?.id]);
 
   useEffect(() => {
@@ -638,16 +672,50 @@ export default function SettingsPage() {
     setRerankerTestDocs(newDocs);
   };
 
-  const applyDetectedFormat = () => {
-    if (rerankerTestResult?.detectedFormat) {
-      setRerankerConfig(prev => ({
-        ...prev,
-        responseFormat: rerankerTestResult.detectedFormat as RerankerResponseFormat,
-      }));
-    }
-  };
+   const applyDetectedFormat = () => {
+     if (rerankerTestResult?.detectedFormat) {
+       setRerankerConfig(prev => ({
+         ...prev,
+         responseFormat: rerankerTestResult.detectedFormat as RerankerResponseFormat,
+       }));
+     }
+   };
 
-  const handlePromptSave = async () => {
+   const handleQualitySave = async () => {
+     if (!user?.id) return;
+     
+     setQualitySaving(true);
+     setQualityMessage(null);
+     
+     try {
+       const response = await fetch("/api/settings", {
+         method: "PATCH",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({
+           operatorId: user.id,
+           key: "reranker_quality_config",
+           value: qualityConfig,
+         }),
+       });
+       
+       const result = await response.json();
+       
+       if (result.success) {
+         setQualityMessage({ type: "success", text: t("settings.saveSuccess") });
+         if (result.setting?.value) {
+           setQualityConfig({ ...DEFAULT_QUALITY_CONFIG, ...result.setting.value });
+         }
+       } else {
+         setQualityMessage({ type: "error", text: result.error || t("settings.saveFailed") });
+       }
+     } catch {
+       setQualityMessage({ type: "error", text: t("settings.saveFailed") });
+     } finally {
+       setQualitySaving(false);
+     }
+   };
+
+   const handlePromptSave = async () => {
     if (!user?.id) return;
     
     setPromptSaving(true);
@@ -1488,6 +1556,157 @@ export default function SettingsPage() {
                 <div className="flex justify-end">
                   <Button onClick={handleRerankerSave} disabled={rerankerSaving}>
                     {rerankerSaving ? t("common.saving") : t("common.save")}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Reranker Quality Control Configuration */}
+        {canEditSettings && rerankerConfig.enabled && (
+          <div className="border border-border p-6">
+            <h2 className="mb-2 font-mono text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              {t("settings.qualityControl") || "Reranker Quality Control"}
+            </h2>
+            <p className="mb-6 font-mono text-[10px] text-muted-foreground">
+              {t("settings.qualityControlDesc") || "Dynamically control result quality based on reranking scores"}
+            </p>
+
+            {qualityLoading ? (
+              <div className="flex h-32 items-center justify-center">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block font-mono text-xs text-foreground">
+                      {t("settings.enableQualityControl") || "Enable Quality Control"}
+                    </label>
+                    <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                      {t("settings.enableQualityControlDesc") || "Use quality thresholds to dynamically return results"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setQualityConfig(prev => ({ ...prev, enabled: !prev.enabled }))}
+                    className={`relative h-6 w-11 rounded-full transition-colors ${
+                      qualityConfig.enabled ? "bg-green-500" : "bg-muted/30"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                        qualityConfig.enabled ? "left-[22px]" : "left-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {qualityConfig.enabled && (
+                  <>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-2 block font-mono text-xs text-muted-foreground">
+                          {t("settings.minResults") || "Min Results"}
+                        </label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max={qualityConfig.maxResults}
+                          value={qualityConfig.minResults}
+                          onChange={(e) => setQualityConfig(prev => ({ ...prev, minResults: Math.max(1, parseInt(e.target.value) || 1) }))}
+                          placeholder="1"
+                        />
+                        <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                          {t("settings.minResultsDesc") || "Minimum results to return (guarantees answer)"}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="mb-2 block font-mono text-xs text-muted-foreground">
+                          {t("settings.maxResults") || "Max Results"}
+                        </label>
+                        <Input
+                          type="number"
+                          min={qualityConfig.minResults}
+                          max="100"
+                          value={qualityConfig.maxResults}
+                          onChange={(e) => setQualityConfig(prev => ({ ...prev, maxResults: Math.min(100, Math.max(prev.minResults, parseInt(e.target.value) || 10)) }))}
+                          placeholder="10"
+                        />
+                        <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                          {t("settings.maxResultsDesc") || "Maximum results to return (prevents too many inputs)"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-2 block font-mono text-xs text-muted-foreground">
+                          {t("settings.scoreThreshold") || "Score Threshold"}
+                        </label>
+                        <Input
+                          type="number"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          value={qualityConfig.scoreThreshold}
+                          onChange={(e) => setQualityConfig(prev => ({ ...prev, scoreThreshold: Math.max(0, Math.min(1, parseFloat(e.target.value) || 0.6)) }))}
+                          placeholder="0.6"
+                        />
+                        <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                          {t("settings.scoreThresholdDesc") || "Minimum relevance score (0.0-1.0)"}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="mb-2 block font-mono text-xs text-muted-foreground">
+                          {t("settings.dropoffThreshold") || "Score Dropoff"}
+                        </label>
+                        <Input
+                          type="number"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          value={qualityConfig.dropoffThreshold}
+                          onChange={(e) => setQualityConfig(prev => ({ ...prev, dropoffThreshold: Math.max(0, Math.min(1, parseFloat(e.target.value) || 0.15)) }))}
+                          placeholder="0.15"
+                        />
+                        <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                          {t("settings.dropoffThresholdDesc") || "Score decrease to stop returning (cliff detection)"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded border border-blue-500/30 bg-blue-500/5 p-4">
+                      <div className="font-mono text-xs font-medium text-blue-500 mb-2">
+                        {t("settings.qualityControlPreview") || "Quality Control Behavior"}
+                      </div>
+                      <div className="space-y-1 font-mono text-[10px] text-muted-foreground">
+                        <div>
+                          • {t("settings.preview1") || `Return at least ${qualityConfig.minResults} result(s)`}
+                        </div>
+                        <div>
+                          • {t("settings.preview2") || `Return at most ${qualityConfig.maxResults} result(s)`}
+                        </div>
+                        <div>
+                          • {t("settings.preview3") || `Stop if score < ${qualityConfig.scoreThreshold.toFixed(2)}`}
+                        </div>
+                        <div>
+                          • {t("settings.preview4") || `Stop if score drops > ${qualityConfig.dropoffThreshold.toFixed(2)} between items`}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {qualityMessage && (
+                  <div className={`font-mono text-xs ${qualityMessage.type === "success" ? "text-green-500" : "text-red-500"}`}>
+                    {qualityMessage.text}
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  <Button onClick={handleQualitySave} disabled={qualitySaving}>
+                    {qualitySaving ? t("common.saving") : t("common.save")}
                   </Button>
                 </div>
               </div>

@@ -6,7 +6,7 @@ import { streamText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import type { ChatConfig, ChatMessageMetadata, Json, HybridSearchChunk, RerankerConfig, SearchType, PromptConfig } from "@/lib/supabase/types";
+import type { ChatConfig, ChatMessageMetadata, Json, HybridSearchChunk, RerankerConfig, RerankerQualityConfig, SearchType, PromptConfig } from "@/lib/supabase/types";
 import { DEFAULT_PROMPTS } from "@/lib/supabase/types";
 import { generateSingleEmbedding, hybridSearchChunksMultiKb, getEmbeddingConfig } from "@/lib/embeddings";
 import { hybridSearchWithReranking } from "@/lib/reranker";
@@ -224,7 +224,31 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           retrievalDebug.rerankerProvider = rerankerConfig?.provider ?? null;
         }
         
-        const baseMatchCount = 5;
+        const { data: qualityConfigData } = await supabase
+          .from("system_settings")
+          .select("value")
+          .eq("key", "reranker_quality_config")
+          .single();
+        
+        const defaultQualityConfig: RerankerQualityConfig = { 
+          enabled: true, 
+          minResults: 1, 
+          maxResults: 10, 
+          scoreThreshold: 0.6, 
+          dropoffThreshold: 0.15 
+        };
+        
+        const qualityConfig: RerankerQualityConfig = qualityConfigData?.value 
+          ? { 
+              enabled: (qualityConfigData.value as Record<string, unknown>).enabled !== false,
+              minResults: ((qualityConfigData.value as Record<string, unknown>).minResults as number) ?? defaultQualityConfig.minResults,
+              maxResults: ((qualityConfigData.value as Record<string, unknown>).maxResults as number) ?? defaultQualityConfig.maxResults,
+              scoreThreshold: ((qualityConfigData.value as Record<string, unknown>).scoreThreshold as number) ?? defaultQualityConfig.scoreThreshold,
+              dropoffThreshold: ((qualityConfigData.value as Record<string, unknown>).dropoffThreshold as number) ?? defaultQualityConfig.dropoffThreshold,
+            }
+          : defaultQualityConfig;
+        
+        const baseMatchCount = qualityConfig.maxResults;
         const candidateCount = isRerankEnabled ? Math.min(baseMatchCount * 5, 100) : baseMatchCount;
         const matchThreshold = isRerankEnabled ? 0.15 : 0.3;
         
@@ -253,7 +277,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             hybridResults,
             content,
             rerankerConfig,
-            baseMatchCount
+            baseMatchCount,
+            qualityConfig
           );
         } else {
           contextChunks = hybridResults.slice(0, baseMatchCount);

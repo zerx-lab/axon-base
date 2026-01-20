@@ -766,6 +766,23 @@ export interface RerankerConfig {
   customHeaders?: Record<string, string>;
 }
 
+/**
+ * 精排结果质量控制配置
+ * 根据精排模型的相关性得分，动态决定返回结果数量
+ */
+export interface RerankerQualityConfig {
+  /** 是否启用质量控制 */
+  enabled: boolean;
+  /** 最少返回结果数（保证有答案） */
+  minResults: number;
+  /** 最多返回结果数（防止过多输入） */
+  maxResults: number;
+  /** 相关性得分阈值（低于此值的结果不返回） */
+  scoreThreshold: number;
+  /** 相邻结果得分下降阈值（下降超过此值则停止返回） */
+  dropoffThreshold: number;
+}
+
 export interface SearchStats {
   vectorOnly: number;
   bm25Only: number;

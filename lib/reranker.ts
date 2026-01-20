@@ -2,6 +2,7 @@ import type {
   HybridSearchChunk, 
   RerankerConfig as BaseRerankerConfig,
   RerankerResponseFormat,
+  RerankerQualityConfig,
 } from "@/lib/supabase/types";
 
 export type RerankerProvider = "cohere" | "jina" | "voyage" | "aliyun" | "openai-compatible";
@@ -383,11 +384,53 @@ export async function rerankChunks(
   return results;
 }
 
+export function selectResultsWithQualityControl(
+  results: HybridSearchChunk[],
+  config: RerankerQualityConfig
+): HybridSearchChunk[] {
+  if (!config.enabled) {
+    return results.slice(0, config.maxResults);
+  }
+
+  if (results.length === 0) {
+    return [];
+  }
+
+  const selected: HybridSearchChunk[] = [];
+  let prevScore = 1.0;
+
+  for (const chunk of results) {
+    const score = chunk.combined_score || 0;
+
+    if (selected.length >= config.maxResults) {
+      break;
+    }
+
+    if (score < config.scoreThreshold) {
+      break;
+    }
+
+    if (prevScore - score > config.dropoffThreshold && selected.length >= config.minResults) {
+      break;
+    }
+
+    selected.push(chunk);
+    prevScore = score;
+  }
+
+  if (selected.length === 0 && results.length > 0) {
+    return results.slice(0, config.minResults);
+  }
+
+  return selected;
+}
+
 export async function hybridSearchWithReranking(
   searchResults: HybridSearchChunk[],
   query: string,
   rerankerConfig: BaseRerankerConfig | null,
-  topK: number = 20
+  topK: number = 20,
+  qualityConfig?: RerankerQualityConfig
 ): Promise<HybridSearchChunk[]> {
   if (!rerankerConfig || !rerankerConfig.enabled) {
     return searchResults.slice(0, topK);
@@ -408,8 +451,14 @@ export async function hybridSearchWithReranking(
 
   const reranked = await rerankChunks(query, searchResults, config, { topK });
   
-  return reranked.map(r => ({
+  const results = reranked.map(r => ({
     ...r.chunk,
     combined_score: r.relevanceScore,
   }));
+
+  if (qualityConfig) {
+    return selectResultsWithQualityControl(results, qualityConfig);
+  }
+
+  return results;
 }
