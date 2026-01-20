@@ -362,22 +362,22 @@ export default function UsersPage() {
 
       {/* Users Table */}
       <div className="border border-border overflow-x-auto">
-        <div className="min-w-[600px]">
+        <div className="min-w-max">
         {/* Table Header */}
-        <div className="grid grid-cols-[1fr_1fr_120px_80px_120px] gap-4 border-b border-border bg-card px-4 py-3">
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+        <div className="grid grid-cols-[minmax(80px,1fr)_minmax(80px,1fr)_100px_80px_auto] gap-4 border-b border-border bg-card px-4 py-3">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground whitespace-nowrap">
             {t("users.username")}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground whitespace-nowrap">
             {t("users.displayName")}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground whitespace-nowrap">
             {t("users.role")}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground whitespace-nowrap">
             {t("common.status")}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground whitespace-nowrap">
             {t("common.actions")}
           </div>
         </div>
@@ -395,7 +395,7 @@ export default function UsersPage() {
           users.map((user) => (
             <div
               key={user.id}
-              className="grid grid-cols-[1fr_1fr_120px_80px_120px] gap-4 border-b border-border px-4 py-3 last:border-b-0 hover:bg-card/50"
+              className="grid grid-cols-[minmax(80px,1fr)_minmax(80px,1fr)_100px_80px_auto] gap-4 border-b border-border px-4 py-3 last:border-b-0 hover:bg-card/50"
             >
               <div className="font-mono text-sm">{user.username}</div>
               <div className="font-mono text-sm text-muted-foreground">
