@@ -17,6 +17,8 @@ on:
       - '.github/workflows/docker-build.yml'
       - 'package.json'
       - 'bun.lock'
+      - 'next.config.*'
+      - 'tsconfig.json'
       - 'crawler-service/pyproject.toml'
       - 'crawler-service/uv.lock'
   workflow_dispatch:
