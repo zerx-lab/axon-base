@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - master
       - develop
     paths:
       - 'docker/Dockerfile.prod'
@@ -141,7 +142,7 @@ jobs:
   notify-deploy:
     needs: [build-nextjs, build-crawler]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 
     steps:
       - name: 📧 通知部署服务
