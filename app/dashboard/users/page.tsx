@@ -362,9 +362,9 @@ export default function UsersPage() {
 
       {/* Users Table */}
       <div className="border border-border overflow-x-auto">
-        <div className="min-w-max">
+        <div className="min-w-[500px]">
         {/* Table Header */}
-        <div className="grid grid-cols-[1fr_1fr_100px_80px_auto] gap-4 border-b border-border bg-card px-4 py-3">
+        <div className="grid grid-cols-[1fr_1fr_100px_80px_100px] gap-4 border-b border-border bg-card px-4 py-3">
           <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground whitespace-nowrap">
             {t("users.username")}
           </div>
@@ -395,7 +395,7 @@ export default function UsersPage() {
           users.map((user) => (
             <div
               key={user.id}
-              className="grid grid-cols-[1fr_1fr_100px_80px_auto] gap-4 border-b border-border px-4 py-3 last:border-b-0 hover:bg-card/50"
+              className="grid grid-cols-[1fr_1fr_100px_80px_100px] gap-4 border-b border-border px-4 py-3 last:border-b-0 hover:bg-card/50"
             >
               <div className="font-mono text-sm">{user.username}</div>
               <div className="font-mono text-sm text-muted-foreground">
