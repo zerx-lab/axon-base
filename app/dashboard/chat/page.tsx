@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { Button, Dialog } from "@/components/ui";
 import { Thread } from "@/components/assistant-ui/thread";
 import { ErrorAlert } from "@/components/chat/ErrorAlert";
+import { ReferencesProvider, type MessageReference } from "@/lib/references-context";
 import {
   AssistantRuntimeProvider,
   useExternalStoreRuntime,
@@ -17,7 +18,7 @@ import { PERMISSIONS } from "@/lib/permissions";
 import type { ChatSession, KnowledgeBase, ChatMessage, ChatMessageMetadata } from "@/lib/supabase/types";
 
 export default function ChatPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { user: authUser, isLoading: authLoading, hasPermission } = useAuth();
   const router = useRouter();
 
@@ -82,7 +83,8 @@ export default function ChatPage() {
 
     try {
       const params = new URLSearchParams({ operatorId: currentUserId });
-      const response = await fetch(`/api/kb?${params}`);
+      // 使用新的 API 获取用户有权限访问的知识库
+      const response = await fetch(`/api/chat/accessible-kb?${params}`);
       const result = await response.json();
       if (result.knowledgeBases) {
         setKnowledgeBases(result.knowledgeBases);
@@ -167,6 +169,7 @@ export default function ChatPage() {
           content: userContent,
           useKnowledgeBase: selectedKbIds.length > 0,
           userMessageId,
+          locale,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -319,6 +322,7 @@ export default function ChatPage() {
         body: JSON.stringify({
           operatorId: currentUserId,
           parentMessageId: parentId,
+          locale,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -441,6 +445,20 @@ export default function ChatPage() {
     onCancel,
     onReload,
   });
+
+  // Build a map of message ID to references for the ReferencesProvider
+  const referencesMap = useMemo(() => {
+    const map = new Map<string, MessageReference[]>();
+    for (const msg of messages) {
+      if (msg.role === "assistant" && msg.metadata) {
+        const metadata = msg.metadata as unknown as ChatMessageMetadata;
+        if (metadata.references && metadata.references.length > 0) {
+          map.set(msg.id, metadata.references);
+        }
+      }
+    }
+    return map;
+  }, [messages]);
 
   useEffect(() => {
     fetchSessions();
@@ -678,9 +696,11 @@ export default function ChatPage() {
         ) : (
           <div className="flex flex-1 overflow-hidden">
             <div className="flex-1 overflow-hidden">
-              <AssistantRuntimeProvider key={currentSession.id} runtime={runtime}>
-                <Thread />
-              </AssistantRuntimeProvider>
+              <ReferencesProvider referencesMap={referencesMap}>
+                <AssistantRuntimeProvider key={currentSession.id} runtime={runtime}>
+                  <Thread />
+                </AssistantRuntimeProvider>
+              </ReferencesProvider>
             </div>
             {debugPanelOpen && (
               <div className="w-80 flex-shrink-0 border-l border-border bg-card overflow-y-auto">

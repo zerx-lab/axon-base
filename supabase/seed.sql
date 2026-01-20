@@ -8,13 +8,16 @@ INSERT INTO roles (name, description, permissions, is_system, is_super_admin) VA
               'system:settings', 'system:logs',
               'kb:list', 'kb:create', 'kb:update', 'kb:delete',
               'docs:list', 'docs:create', 'docs:update', 'docs:delete',
-              'embedding:view', 'embedding:manage', 'embedding:search'], 
+              'embedding:view', 'embedding:manage', 'embedding:search',
+              'chat:access', 'chat:create', 'chat:delete', 'chat:kb_permissions:view', 'chat:kb_permissions:manage'], 
         TRUE, FALSE),
     ('User Manager', 'Can manage users', 
-        ARRAY['users:list', 'users:create', 'users:update', 'users:toggle_active', 'users:reset_password'], 
+        ARRAY['users:list', 'users:create', 'users:update', 'users:toggle_active', 'users:reset_password',
+              'chat:access', 'chat:create'], 
         TRUE, FALSE),
     ('Viewer', 'Read-only access', 
-        ARRAY['users:list', 'roles:list', 'kb:list', 'docs:list', 'embedding:view', 'embedding:search'], 
+        ARRAY['users:list', 'roles:list', 'kb:list', 'docs:list', 'embedding:view', 'embedding:search',
+              'chat:access', 'chat:create'], 
         TRUE, FALSE)
 ON CONFLICT (name) DO NOTHING;
 

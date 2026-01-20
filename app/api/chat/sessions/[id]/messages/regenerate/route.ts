@@ -53,9 +53,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { id: sessionId } = await params;
     const body = await request.json();
-    const { operatorId, parentMessageId } = body as {
+const { operatorId, parentMessageId, locale = "zh" } = body as {
       operatorId: string;
       parentMessageId: string;
+      locale?: string;
     };
 
     if (!operatorId || !parentMessageId) {
@@ -198,7 +199,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const customPrompt = (session.settings as Record<string, unknown>)?.systemPrompt as string | undefined;
 
-    let systemPrompt: string;
+let systemPrompt: string;
     if (contextChunks.length > 0) {
       const contextText = contextChunks
         .map((chunk, i) => `[${i + 1}] ${chunk.document_title}:\n${chunk.chunk_content}`)
@@ -210,6 +211,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     } else {
       systemPrompt = promptConfig.chatNoContext;
     }
+
+    // Add language instruction
+    const languageName = locale === "zh" ? "Chinese (Simplified)" : "English";
+    systemPrompt += `\n\n## Response Language\nYou MUST respond in ${languageName}. This is mandatory regardless of the language used in the context or documents.`;
 
     messages.push({ role: "system", content: systemPrompt });
 

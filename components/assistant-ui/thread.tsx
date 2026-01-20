@@ -1,8 +1,12 @@
+"use client";
+
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { ToolFallback } from "@/components/assistant-ui/tool-fallback";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
+import { useReferences, type MessageReference } from "@/lib/references-context";
 import {
   ActionBarPrimitive,
   BranchPickerPrimitive,
@@ -10,24 +14,29 @@ import {
   MessagePrimitive,
   ThreadPrimitive,
   useThreadRuntime,
+  useMessage,
 } from "@assistant-ui/react";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
   CheckIcon,
+  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   CopyIcon,
+  ExternalLinkIcon,
+  FileTextIcon,
   PencilIcon,
   RefreshCwIcon,
   SquareIcon,
 } from "lucide-react";
-import type { FC } from "react";
+import { useState, type FC } from "react";
 
 const ThinkingIndicator: FC = () => {
+  const { t } = useI18n();
   return (
     <div className="flex items-center gap-1.5 py-3 text-muted-foreground">
-      <span className="sr-only">AI is thinking</span>
+      <span className="sr-only">{t("chat.thinking")}</span>
       <span 
         className="size-2 rounded-full bg-current" 
         style={{ animation: "thinking-pulse 1.4s ease-in-out infinite" }}
@@ -73,10 +82,11 @@ export const Thread: FC = () => {
 };
 
 const ThreadScrollToBottom: FC = () => {
+  const { t } = useI18n();
   return (
     <ThreadPrimitive.ScrollToBottom asChild>
       <TooltipIconButton
-        tooltip="Scroll to bottom"
+        tooltip={t("chat.scrollToBottom")}
         variant="outline"
         className="aui-thread-scroll-to-bottom absolute -top-12 z-10 self-center rounded-full size-10 p-2 disabled:invisible bg-background hover:bg-accent"
       >
@@ -87,37 +97,37 @@ const ThreadScrollToBottom: FC = () => {
 };
 
 const ThreadWelcome: FC = () => {
-  const runtime = useThreadRuntime();
-  const isEmpty = runtime.getState().messages.length === 0;
-
-  if (!isEmpty) return null;
+  const { t } = useI18n();
 
   return (
-    <div className="aui-thread-welcome-root mx-auto my-auto flex w-full max-w-[var(--thread-max-width)] grow flex-col">
-      <div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
-        <div className="aui-thread-welcome-message flex size-full flex-col justify-center px-4">
-          <h1 className="aui-thread-welcome-message-inner font-semibold text-2xl">
-            Hello there!
-          </h1>
-          <p className="aui-thread-welcome-message-inner text-muted-foreground text-xl">
-            How can I help you today?
-          </p>
+    <ThreadPrimitive.Empty>
+      <div className="aui-thread-welcome-root mx-auto my-auto flex w-full max-w-[var(--thread-max-width)] grow flex-col">
+        <div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
+          <div className="aui-thread-welcome-message flex size-full flex-col justify-center px-4">
+            <h1 className="aui-thread-welcome-message-inner font-semibold text-2xl">
+              {t("chat.welcomeTitle")}
+            </h1>
+            <p className="aui-thread-welcome-message-inner text-muted-foreground text-xl">
+              {t("chat.welcomeSubtitle")}
+            </p>
+          </div>
         </div>
       </div>
-    </div>
+    </ThreadPrimitive.Empty>
   );
 };
 
 const Composer: FC = () => {
+  const { t } = useI18n();
   return (
     <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col">
       <div className="flex w-full flex-col rounded-2xl border border-input bg-background px-1 pt-2 outline-none transition-all duration-200 has-[textarea:focus-visible]:border-foreground/20 has-[textarea:focus-visible]:shadow-[0_0_0_3px_rgba(0,0,0,0.04)] dark:has-[textarea:focus-visible]:shadow-[0_0_0_3px_rgba(255,255,255,0.06)]">
         <ComposerPrimitive.Input
-          placeholder="Send a message..."
+          placeholder={t("chat.inputPlaceholder")}
           className="aui-composer-input mb-1 max-h-32 min-h-14 w-full resize-none bg-transparent px-4 pt-2 pb-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:outline-none"
           rows={1}
           autoFocus
-          aria-label="Message input"
+          aria-label={t("chat.inputPlaceholder")}
         />
         <ComposerAction />
       </div>
@@ -126,6 +136,7 @@ const Composer: FC = () => {
 };
 
 const ComposerAction: FC = () => {
+  const { t } = useI18n();
   const runtime = useThreadRuntime();
   const isRunning = runtime.getState().isRunning;
 
@@ -134,13 +145,13 @@ const ComposerAction: FC = () => {
       {!isRunning ? (
         <ComposerPrimitive.Send asChild>
           <TooltipIconButton
-            tooltip="Send message"
+            tooltip={t("chat.sendMessage")}
             side="bottom"
             type="submit"
             variant="default"
             size="icon"
             className="aui-composer-send size-8 rounded-full"
-            aria-label="Send message"
+            aria-label={t("chat.sendMessage")}
           >
             <ArrowUpIcon className="aui-composer-send-icon size-4" />
           </TooltipIconButton>
@@ -152,7 +163,7 @@ const ComposerAction: FC = () => {
             variant="default"
             size="icon"
             className="aui-composer-cancel size-8 rounded-full"
-            aria-label="Stop generating"
+            aria-label={t("chat.stopGenerating")}
           >
             <SquareIcon className="aui-composer-cancel-icon size-3 fill-current" />
           </Button>
@@ -163,6 +174,9 @@ const ComposerAction: FC = () => {
 };
 
 const AssistantMessage: FC = () => {
+  const messageId = useMessage((m) => m.id);
+  const references = useReferences(messageId);
+
   return (
     <MessagePrimitive.Root
       className="aui-assistant-message-root relative mx-auto w-full max-w-[var(--thread-max-width)] py-3"
@@ -178,6 +192,10 @@ const AssistantMessage: FC = () => {
         />
       </div>
 
+      {references && references.length > 0 && (
+        <ReferencesSection references={references} />
+      )}
+
       <div className="aui-assistant-message-footer mt-1 ml-2 flex">
         <BranchPicker />
         <AssistantActionBar />
@@ -186,7 +204,89 @@ const AssistantMessage: FC = () => {
   );
 };
 
+interface ReferencesSectionProps {
+  readonly references: MessageReference[];
+}
+
+const ReferencesSection: FC<ReferencesSectionProps> = ({ references }) => {
+  const { t } = useI18n();
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="mt-3 mx-2">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <FileTextIcon className="size-3.5" />
+        <span>{t("chat.referenceSources")} ({references.length})</span>
+        <ChevronDownIcon 
+          className={cn(
+            "size-3.5 transition-transform duration-200",
+            isExpanded && "rotate-180"
+          )} 
+        />
+      </button>
+      
+      {isExpanded && (
+        <div className="mt-2 space-y-2 border-l-2 border-muted pl-3">
+          {references.map((ref, index) => (
+            <ReferenceItem key={`${ref.documentId}-${ref.chunkIndex ?? index}`} reference={ref} index={index} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface ReferenceItemProps {
+  readonly reference: MessageReference;
+  readonly index: number;
+}
+
+const ReferenceItem: FC<ReferenceItemProps> = ({ reference, index }) => {
+  return (
+    <div className="group rounded-md bg-muted/50 p-2.5 text-xs">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <span className="shrink-0 flex items-center justify-center size-5 rounded bg-primary/10 text-primary font-medium text-[10px]">
+            {index + 1}
+          </span>
+          <span className="font-medium truncate" title={reference.documentTitle}>
+            {reference.documentTitle || "Untitled"}
+          </span>
+        </div>
+        {reference.similarity !== undefined && (
+          <span className="shrink-0 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+            {(reference.similarity * 100).toFixed(0)}%
+          </span>
+        )}
+      </div>
+      
+      {reference.sourceUrl && (
+        <a
+          href={reference.sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-1.5 flex items-center gap-1 text-[10px] text-blue-500 hover:text-blue-400 transition-colors truncate"
+          title={reference.sourceUrl}
+        >
+          <ExternalLinkIcon className="size-3 shrink-0" />
+          <span className="truncate">{reference.sourceUrl}</span>
+        </a>
+      )}
+      
+      {reference.contextSummary && (
+        <p className="mt-1.5 text-[10px] text-muted-foreground line-clamp-2">
+          {reference.contextSummary}
+        </p>
+      )}
+    </div>
+  );
+};
+
 const AssistantActionBar: FC = () => {
+  const { t } = useI18n();
   return (
     <ActionBarPrimitive.Root
       hideWhenRunning
@@ -195,7 +295,7 @@ const AssistantActionBar: FC = () => {
       className="aui-assistant-action-bar-root col-start-3 row-start-2 -ml-1 flex gap-1 text-muted-foreground data-[floating]:absolute data-[floating]:rounded-md data-[floating]:border data-[floating]:bg-background data-[floating]:p-1 data-[floating]:shadow-sm"
     >
       <ActionBarPrimitive.Copy asChild>
-        <TooltipIconButton tooltip="Copy">
+        <TooltipIconButton tooltip={t("chat.copy")}>
           <MessagePrimitive.If copied>
             <CheckIcon />
           </MessagePrimitive.If>
@@ -205,7 +305,7 @@ const AssistantActionBar: FC = () => {
         </TooltipIconButton>
       </ActionBarPrimitive.Copy>
       <ActionBarPrimitive.Reload asChild>
-        <TooltipIconButton tooltip="Refresh">
+        <TooltipIconButton tooltip={t("chat.regenerate")}>
           <RefreshCwIcon />
         </TooltipIconButton>
       </ActionBarPrimitive.Reload>
@@ -234,6 +334,7 @@ const UserMessage: FC = () => {
 };
 
 const UserActionBar: FC = () => {
+  const { t } = useI18n();
   return (
     <ActionBarPrimitive.Root
       hideWhenRunning
@@ -241,7 +342,7 @@ const UserActionBar: FC = () => {
       className="aui-user-action-bar-root flex flex-col items-end"
     >
       <ActionBarPrimitive.Edit asChild>
-        <TooltipIconButton tooltip="Edit" className="aui-user-action-edit p-4">
+        <TooltipIconButton tooltip={t("chat.edit")} className="aui-user-action-edit p-4">
           <PencilIcon />
         </TooltipIconButton>
       </ActionBarPrimitive.Edit>
@@ -250,6 +351,7 @@ const UserActionBar: FC = () => {
 };
 
 const EditComposer: FC = () => {
+  const { t } = useI18n();
   return (
     <MessagePrimitive.Root className="aui-edit-composer-wrapper mx-auto flex w-full max-w-[var(--thread-max-width)] flex-col px-2 py-3">
       <ComposerPrimitive.Root className="aui-edit-composer-root ml-auto flex w-full max-w-[85%] flex-col rounded-2xl bg-muted">
@@ -260,11 +362,11 @@ const EditComposer: FC = () => {
         <div className="aui-edit-composer-footer mx-3 mb-3 flex items-center gap-2 self-end">
           <ComposerPrimitive.Cancel asChild>
             <Button variant="ghost" size="sm">
-              Cancel
+              {t("common.cancel")}
             </Button>
           </ComposerPrimitive.Cancel>
           <ComposerPrimitive.Send asChild>
-            <Button size="sm">Update</Button>
+            <Button size="sm">{t("chat.update")}</Button>
           </ComposerPrimitive.Send>
         </div>
       </ComposerPrimitive.Root>
@@ -276,6 +378,7 @@ const BranchPicker: FC<BranchPickerPrimitive.Root.Props> = ({
   className,
   ...rest
 }) => {
+  const { t } = useI18n();
   return (
     <BranchPickerPrimitive.Root
       hideWhenSingleBranch
@@ -286,7 +389,7 @@ const BranchPicker: FC<BranchPickerPrimitive.Root.Props> = ({
       {...rest}
     >
       <BranchPickerPrimitive.Previous asChild>
-        <TooltipIconButton tooltip="Previous">
+        <TooltipIconButton tooltip={t("chat.previous")}>
           <ChevronLeftIcon />
         </TooltipIconButton>
       </BranchPickerPrimitive.Previous>
@@ -294,7 +397,7 @@ const BranchPicker: FC<BranchPickerPrimitive.Root.Props> = ({
         <BranchPickerPrimitive.Number /> / <BranchPickerPrimitive.Count />
       </span>
       <BranchPickerPrimitive.Next asChild>
-        <TooltipIconButton tooltip="Next">
+        <TooltipIconButton tooltip={t("chat.next")}>
           <ChevronRightIcon />
         </TooltipIconButton>
       </BranchPickerPrimitive.Next>

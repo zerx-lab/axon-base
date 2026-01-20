@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
-import { hasPermission } from "@/lib/supabase/access";
+import { hasPermission, isSuperAdmin } from "@/lib/supabase/access";
 import { Permissions, getAllPermissions, permissionsMeta } from "@/lib/supabase/permissions";
 
 // GET /api/admin/roles - List roles
@@ -160,18 +160,38 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // Check if role is system role
+    // Check if role is system role or super admin role
     const { data: existingRole } = await supabase
       .from("roles")
-      .select("is_system")
+      .select("is_system, is_super_admin")
       .eq("id", roleId)
       .single();
 
-    if (existingRole?.is_system) {
+    // Check if role exists
+    if (!existingRole) {
       return NextResponse.json(
-        { error: "Cannot modify system roles" },
+        { error: "Role not found" },
+        { status: 404 }
+      );
+    }
+
+    // Super Administrator role can never be modified
+    if (existingRole.is_super_admin) {
+      return NextResponse.json(
+        { error: "Cannot modify Super Administrator role" },
         { status: 400 }
       );
+    }
+
+    // System roles can only be modified by super admins
+    if (existingRole.is_system) {
+      const operatorIsSuperAdmin = await isSuperAdmin(supabase, operatorId);
+      if (!operatorIsSuperAdmin) {
+        return NextResponse.json(
+          { error: "Only super administrators can modify system roles" },
+          { status: 403 }
+        );
+      }
     }
 
     // If changing name, check if it exists
@@ -261,18 +281,38 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Check if role is system role
+    // Check if role is system role or super admin role
     const { data: existingRole } = await supabase
       .from("roles")
-      .select("is_system")
+      .select("is_system, is_super_admin")
       .eq("id", roleId)
       .single();
 
-    if (existingRole?.is_system) {
+    // Check if role exists
+    if (!existingRole) {
       return NextResponse.json(
-        { error: "Cannot delete system roles" },
+        { error: "Role not found" },
+        { status: 404 }
+      );
+    }
+
+    // Super Administrator role can never be deleted
+    if (existingRole.is_super_admin) {
+      return NextResponse.json(
+        { error: "Cannot delete Super Administrator role" },
         { status: 400 }
       );
+    }
+
+    // System roles can only be deleted by super admins
+    if (existingRole.is_system) {
+      const operatorIsSuperAdmin = await isSuperAdmin(supabase, operatorId);
+      if (!operatorIsSuperAdmin) {
+        return NextResponse.json(
+          { error: "Only super administrators can delete system roles" },
+          { status: 403 }
+        );
+      }
     }
 
     // Check if role has users

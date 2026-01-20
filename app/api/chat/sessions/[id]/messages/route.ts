@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/lib/supabase/access";
 import { Permissions } from "@/lib/supabase/permissions";
-import { streamText } from "ai";
+import { streamText, generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
@@ -10,7 +10,7 @@ import type { ChatConfig, ChatMessageMetadata, Json, HybridSearchChunk, Reranker
 import { DEFAULT_PROMPTS } from "@/lib/supabase/types";
 import { generateSingleEmbedding, hybridSearchChunksMultiKb, getEmbeddingConfig } from "@/lib/embeddings";
 import { hybridSearchWithReranking } from "@/lib/reranker";
-import { extractErrorMessage, extractDetailedError, type ExtractedError } from "@/lib/error-extractor";
+import { extractDetailedError } from "@/lib/error-extractor";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -112,11 +112,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { id: sessionId } = await params;
     const body = await request.json();
-    const { operatorId, content, useKnowledgeBase = true, userMessageId } = body as {
+const { operatorId, content, useKnowledgeBase = true, userMessageId, locale = "zh" } = body as {
       operatorId: string;
       content: string;
       useKnowledgeBase?: boolean;
       userMessageId?: string;
+      locale?: string;
     };
 
     if (!operatorId || !content) {
@@ -333,7 +334,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const customPrompt = (session.settings as Record<string, unknown>)?.systemPrompt as string | undefined;
     
-    let systemPrompt: string;
+let systemPrompt: string;
     if (contextChunks.length > 0) {
       const contextText = contextChunks
         .map((chunk, i) => `[${i + 1}] ${chunk.document_title}:\n${chunk.chunk_content}`)
@@ -345,6 +346,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     } else {
       systemPrompt = promptConfig.chatNoContext;
     }
+
+    // Add language instruction
+    const languageName = locale === "zh" ? "Chinese (Simplified)" : "English";
+    systemPrompt += `\n\n## Response Language\nYou MUST respond in ${languageName}. This is mandatory regardless of the language used in the context or documents.`;
 
     messages.push({ role: "system", content: systemPrompt });
 
@@ -404,13 +409,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             })
             .eq("id", assistantMessage.id);
 
-          if (!session.title && text) {
-            const title = text.substring(0, 50) + (text.length > 50 ? "..." : "");
-            await supabase
-              .from("chat_sessions")
-              .update({ title })
-              .eq("id", sessionId);
-          }
         },
         onError: async (error) => {
           capturedError = error;
@@ -466,6 +464,49 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                outputTokens: usage?.outputTokens,
              }
            })}\n\n`));
+
+           // Generate title for first message (when there are no previous messages)
+           const isFirstMessage = !previousMessages || previousMessages.length === 0;
+           if (isFirstMessage) {
+             try {
+               const titlePrompt = `Based on the user's first message in a conversation, generate a concise and descriptive title for this chat session.
+
+Rules:
+1. The title should be 2-6 words, maximum 50 characters
+2. Capture the main topic or intent of the conversation
+3. Use the same language as the user's message
+4. Do NOT use quotes around the title
+5. Do NOT include prefixes like "Title:" or "Chat:"
+6. Return ONLY the title, nothing else
+
+User's message: ${content}`;
+
+               const titleResult = await generateText({
+                 model,
+                 messages: [{ role: "user", content: titlePrompt }],
+                 maxOutputTokens: 100,
+                 temperature: 0.7,
+               });
+
+               const generatedTitle = titleResult.text.trim().slice(0, 100);
+               
+               if (generatedTitle) {
+                 await supabase
+                   .from("chat_sessions")
+                   .update({ title: generatedTitle })
+                   .eq("id", sessionId);
+
+                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                   type: "title_generated", 
+                   title: generatedTitle,
+                   sessionId: sessionId,
+                 })}\n\n`));
+               }
+             } catch (titleError) {
+               console.error("Failed to generate title:", titleError);
+               // Don't fail the request if title generation fails
+             }
+           }
           } catch (streamErrorCaught) {
             const finalError = capturedError || streamErrorCaught;
             const extracted = extractDetailedError(finalError);

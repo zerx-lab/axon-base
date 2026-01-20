@@ -562,6 +562,51 @@ export interface Database {
           }
         ];
       };
+      chat_kb_permissions: {
+        Row: {
+          id: string;
+          role_id: string;
+          kb_id: string;
+          can_read: boolean;
+          can_ask: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          role_id: string;
+          kb_id: string;
+          can_read?: boolean;
+          can_ask?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          role_id?: string;
+          kb_id?: string;
+          can_read?: boolean;
+          can_ask?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "chat_kb_permissions_role_id_fkey";
+            columns: ["role_id"];
+            isOneToOne: false;
+            referencedRelation: "roles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "chat_kb_permissions_kb_id_fkey";
+            columns: ["kb_id"];
+            isOneToOne: false;
+            referencedRelation: "knowledge_bases";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -618,6 +663,7 @@ export type ChatMessageStatus = "pending" | "streaming" | "completed" | "failed"
 export type Role = Database["public"]["Tables"]["roles"]["Row"];
 export type User = Database["public"]["Tables"]["users"]["Row"];
 export type Session = Database["public"]["Tables"]["sessions"]["Row"];
+export type ChatKBPermission = Database["public"]["Tables"]["chat_kb_permissions"]["Row"];
 export type KnowledgeBase = Database["public"]["Tables"]["knowledge_bases"]["Row"];
 export type Document = Database["public"]["Tables"]["documents"]["Row"];
 
@@ -919,37 +965,50 @@ export interface PromptConfig {
 }
 
 export const DEFAULT_PROMPTS: PromptConfig = {
-  chatWithContext: `You are a knowledge base assistant. Answer questions based on the provided context from the knowledge base. If the context doesn't contain relevant information, you can briefly explain what you found and suggest rephrasing the question.
+  chatWithContext: `You are a knowledge base assistant. Answer questions ONLY using the context provided below.
 
 {{customPrompt}}
 
-RULES:
-1. Prioritize information from the provided context
-2. If context is insufficient, acknowledge it honestly
-3. You may cite sources using [number] format
-4. For greetings or general questions about your capabilities, respond naturally
+## RULES:
 
-Context from knowledge base:
-{{context}}`,
-  chatNoContext: `You are a knowledge base assistant. The search returned no relevant results for this query.
+1. **Only use the provided context** - If the answer is not in the context, simply say: "Sorry, I don't have information about this topic."
 
-Please respond helpfully:
-- For greetings, introduce yourself as a knowledge base assistant
-- For questions, suggest the user rephrase their query or check if the knowledge base contains relevant documents
-- Be polite and helpful`,
-  docQA: `You are a document Q&A assistant. Answer the user's question based ONLY on the provided document fragments below.
+2. **Never fabricate** - Do not use general knowledge or make assumptions. Do not say "typically" or "usually" unless the context says so.
 
-STRICT RULES:
-1. You can ONLY use information from the provided fragments to answer
-2. If the fragments don't contain enough information, say "Based on the provided document content, I cannot find relevant information to answer this question."
-3. Do NOT make up or infer information that is not explicitly stated in the fragments
-4. Cite which fragment(s) your answer is based on when possible
-5. Keep your answer concise and accurate
+3. **Cite sources** - Use [number] format to cite (e.g., [1], [2]).
+
+4. **Be concise** - Give direct answers. If information is partial, state what you know and what's missing.
+
+5. **Greetings** - For greetings, briefly introduce yourself as a knowledge base assistant.
+
+---
+CONTEXT:
+{{context}}
+---`,
+
+  chatNoContext: `You are a knowledge base assistant. No relevant documents were found.
+
+## How to respond:
+
+- **For greetings:** "Hello! I'm a knowledge base assistant. How can I help you?"
+- **For questions:** "Sorry, I don't have information about this topic."
+
+Do NOT answer using general knowledge.`,
+
+  docQA: `You are a document Q&A assistant. Answer ONLY using the document fragments below.
+
+## RULES:
+
+1. **Only use the fragments below** - If the answer is not in the fragments, say: "Sorry, I cannot find this information in the document."
+
+2. **Never fabricate** - Do not make up or infer information not explicitly stated.
+
+3. **Cite sources** - Reference which fragment your answer comes from.
 
 Document: "{{documentTitle}}"
 
 ---
-DOCUMENT FRAGMENTS:
+FRAGMENTS:
 {{context}}
 ---`,
 }

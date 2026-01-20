@@ -26,6 +26,8 @@ export const Permissions = {
   CHAT_ACCESS: "chat:access",
   CHAT_CREATE: "chat:create",
   CHAT_DELETE: "chat:delete",
+  CHAT_KB_PERMISSIONS_VIEW: "chat:kb_permissions:view",
+  CHAT_KB_PERMISSIONS_MANAGE: "chat:kb_permissions:manage",
 } as const;
 
 export type Permission = (typeof Permissions)[keyof typeof Permissions];
@@ -137,6 +139,14 @@ export const permissionsMeta: Record<
   },
   [Permissions.CHAT_DELETE]: {
     i18nKey: "permissions.chat.delete",
+    category: "chat",
+  },
+  [Permissions.CHAT_KB_PERMISSIONS_VIEW]: {
+    i18nKey: "permissions.chat.kbPermissionsView",
+    category: "chat",
+  },
+  [Permissions.CHAT_KB_PERMISSIONS_MANAGE]: {
+    i18nKey: "permissions.chat.kbPermissionsManage",
     category: "chat",
   },
 };

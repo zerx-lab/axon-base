@@ -17,6 +17,7 @@ const navigationItems = [
   { key: "nav.users", href: "/dashboard/users", icon: UsersIcon },
   { key: "nav.roles", href: "/dashboard/roles", icon: ShieldIcon },
   { key: "nav.knowledgeBases", href: "/dashboard/knowledge-bases", icon: BookIcon },
+  { key: "nav.kbPermissions", href: "/dashboard/kb-permissions", icon: LockIcon },
   { key: "nav.chat", href: "/dashboard/chat", icon: ChatIcon },
   { key: "nav.tasks", href: "/dashboard/tasks", icon: TaskIcon },
   { key: "nav.settings", href: "/dashboard/settings", icon: SettingsIcon },
@@ -232,6 +233,16 @@ function ChatIcon({ className }: { readonly className?: string }) {
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
       <path d="M8 10h8M8 14h4" />
+    </svg>
+  );
+}
+
+function LockIcon({ className }: { readonly className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+      <circle cx="12" cy="16" r="1" />
     </svg>
   );
 }

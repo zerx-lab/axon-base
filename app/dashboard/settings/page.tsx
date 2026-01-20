@@ -6,6 +6,7 @@ import { useTheme } from "@/lib/theme";
 import { useAuth } from "@/lib/auth-context";
 import { Button, Input } from "@/components/ui";
 import { PERMISSIONS } from "@/lib/permissions";
+import { DEFAULT_PROMPTS, type PromptConfig } from "@/lib/supabase/types";
 
 interface EmbeddingConfig {
   provider: "openai" | "azure" | "local" | "aliyun";
@@ -159,47 +160,120 @@ const RERANKER_PROVIDER_PRESETS: Record<RerankerProvider, Partial<RerankerConfig
   },
 };
 
-interface PromptConfig {
-  chatWithContext: string;
-  chatNoContext: string;
-  docQA: string;
+// PromptConfig imported from @/lib/supabase/types
+
+// Configuration export format
+interface ExportedConfig {
+  version: string;
+  exportedAt: string;
+  includesApiKeys: boolean;
+  embedding?: EmbeddingConfig;
+  chat?: ChatConfig;
+  reranker?: RerankerConfig;
+  quality?: RerankerQualityConfig;
+  prompts?: PromptConfig;
 }
 
-const DEFAULT_PROMPTS: PromptConfig = {
-  chatWithContext: `You are a knowledge base assistant. Answer questions based on the provided context from the knowledge base. If the context doesn't contain relevant information, you can briefly explain what you found and suggest rephrasing the question.
+// Validation functions for imported config
+function validateEmbeddingConfig(config: unknown): config is Partial<EmbeddingConfig> {
+  if (typeof config !== "object" || config === null) return false;
+  const c = config as Record<string, unknown>;
+  
+  // Check critical fields have correct types if present
+  if (c.provider !== undefined && !["openai", "azure", "local", "aliyun"].includes(c.provider as string)) return false;
+  if (c.baseUrl !== undefined && typeof c.baseUrl !== "string") return false;
+  if (c.apiKey !== undefined && typeof c.apiKey !== "string") return false;
+  if (c.model !== undefined && typeof c.model !== "string") return false;
+  if (c.dimensions !== undefined && typeof c.dimensions !== "number") return false;
+  if (c.batchSize !== undefined && typeof c.batchSize !== "number") return false;
+  if (c.chunkSize !== undefined && typeof c.chunkSize !== "number") return false;
+  if (c.chunkOverlap !== undefined && typeof c.chunkOverlap !== "number") return false;
+  if (c.contextEnabled !== undefined && typeof c.contextEnabled !== "boolean") return false;
+  
+  return true;
+}
 
-{{customPrompt}}
+function validateChatConfig(config: unknown): config is Partial<ChatConfig> {
+  if (typeof config !== "object" || config === null) return false;
+  const c = config as Record<string, unknown>;
+  
+  if (c.provider !== undefined && !["openai", "anthropic", "openai-compatible"].includes(c.provider as string)) return false;
+  if (c.baseUrl !== undefined && typeof c.baseUrl !== "string") return false;
+  if (c.apiKey !== undefined && typeof c.apiKey !== "string") return false;
+  if (c.model !== undefined && typeof c.model !== "string") return false;
+  if (c.maxTokens !== undefined && typeof c.maxTokens !== "number") return false;
+  if (c.temperature !== undefined && typeof c.temperature !== "number") return false;
+  
+  return true;
+}
 
-RULES:
-1. Prioritize information from the provided context
-2. If context is insufficient, acknowledge it honestly
-3. You may cite sources using [number] format
-4. For greetings or general questions about your capabilities, respond naturally
+function validateRerankerConfig(config: unknown): config is Partial<RerankerConfig> {
+  if (typeof config !== "object" || config === null) return false;
+  const c = config as Record<string, unknown>;
+  
+  if (c.provider !== undefined && !["cohere", "jina", "voyage", "aliyun", "openai-compatible", "none"].includes(c.provider as string)) return false;
+  if (c.apiKey !== undefined && typeof c.apiKey !== "string") return false;
+  if (c.model !== undefined && typeof c.model !== "string") return false;
+  if (c.baseUrl !== undefined && typeof c.baseUrl !== "string") return false;
+  if (c.enabled !== undefined && typeof c.enabled !== "boolean") return false;
+  if (c.responseFormat !== undefined && !["cohere", "jina", "voyage", "aliyun", "auto"].includes(c.responseFormat as string)) return false;
+  
+  return true;
+}
 
-Context from knowledge base:
-{{context}}`,
-  chatNoContext: `You are a knowledge base assistant. The search returned no relevant results for this query.
+function validateQualityConfig(config: unknown): config is Partial<RerankerQualityConfig> {
+  if (typeof config !== "object" || config === null) return false;
+  const c = config as Record<string, unknown>;
+  
+  if (c.enabled !== undefined && typeof c.enabled !== "boolean") return false;
+  if (c.minResults !== undefined && typeof c.minResults !== "number") return false;
+  if (c.maxResults !== undefined && typeof c.maxResults !== "number") return false;
+  if (c.scoreThreshold !== undefined && typeof c.scoreThreshold !== "number") return false;
+  if (c.dropoffThreshold !== undefined && typeof c.dropoffThreshold !== "number") return false;
+  
+  return true;
+}
 
-Please respond helpfully:
-- For greetings, introduce yourself as a knowledge base assistant
-- For questions, suggest the user rephrase their query or check if the knowledge base contains relevant documents
-- Be polite and helpful`,
-  docQA: `You are a document Q&A assistant. Answer the user's question based ONLY on the provided document fragments below.
+function validatePromptConfig(config: unknown): config is Partial<PromptConfig> {
+  if (typeof config !== "object" || config === null) return false;
+  const c = config as Record<string, unknown>;
+  
+  if (c.chatWithContext !== undefined && typeof c.chatWithContext !== "string") return false;
+  if (c.chatNoContext !== undefined && typeof c.chatNoContext !== "string") return false;
+  if (c.docQA !== undefined && typeof c.docQA !== "string") return false;
+  
+  return true;
+}
 
-STRICT RULES:
-1. You can ONLY use information from the provided fragments to answer
-2. If the fragments don't contain enough information, say "Based on the provided document content, I cannot find relevant information to answer this question."
-3. Do NOT make up or infer information that is not explicitly stated in the fragments
-4. Cite which fragment(s) your answer is based on when possible
-5. Keep your answer concise and accurate
+function validateExportedConfig(config: unknown): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  if (typeof config !== "object" || config === null) {
+    return { valid: false, errors: ["Invalid config format"] };
+  }
+  
+  const c = config as Record<string, unknown>;
+  
+  if (c.embedding !== undefined && !validateEmbeddingConfig(c.embedding)) {
+    errors.push("Invalid embedding configuration");
+  }
+  if (c.chat !== undefined && !validateChatConfig(c.chat)) {
+    errors.push("Invalid chat configuration");
+  }
+  if (c.reranker !== undefined && !validateRerankerConfig(c.reranker)) {
+    errors.push("Invalid reranker configuration");
+  }
+  if (c.quality !== undefined && !validateQualityConfig(c.quality)) {
+    errors.push("Invalid quality configuration");
+  }
+  if (c.prompts !== undefined && !validatePromptConfig(c.prompts)) {
+    errors.push("Invalid prompt configuration");
+  }
+  
+  return { valid: errors.length === 0, errors };
+}
 
-Document: "{{documentTitle}}"
-
----
-DOCUMENT FRAGMENTS:
-{{context}}
----`,
-};
+// DEFAULT_PROMPTS imported from @/lib/supabase/types
 
 export default function SettingsPage() {
   const { t, locale, setLocale } = useI18n();
@@ -281,6 +355,13 @@ export default function SettingsPage() {
    const [promptLoading, setPromptLoading] = useState(true);
    const [promptSaving, setPromptSaving] = useState(false);
    const [promptMessage, setPromptMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+   // Import/Export states
+   const [includeApiKeys, setIncludeApiKeys] = useState(false);
+   const [exporting, setExporting] = useState(false);
+   const [importing, setImporting] = useState(false);
+   const [importPreview, setImportPreview] = useState<ExportedConfig | null>(null);
+   const [importExportMessage, setImportExportMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const permissions = user?.permissions || [];
   const canEditSettings = permissions.includes(PERMISSIONS.SYSTEM_SETTINGS) || permissions.includes("*");
@@ -756,6 +837,228 @@ export default function SettingsPage() {
     }));
     setPromptMessage({ type: "success", text: t("settings.promptResetSuccess") });
   };
+
+  // Export configuration handler
+  const handleExportConfig = useCallback(async () => {
+    if (!user?.id) return;
+    
+    setExporting(true);
+    setImportExportMessage(null);
+
+    try {
+      // Fetch real configuration from server (including API keys if requested)
+      const response = await fetch("/api/settings/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operatorId: user.id,
+          includeApiKeys: includeApiKeys,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || "Export failed");
+      }
+
+      const exportData = result.config;
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `axondoc-config-${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setImportExportMessage({ type: "success", text: t("settings.exportSuccess") });
+    } catch {
+      setImportExportMessage({ type: "error", text: t("settings.exportFailed") });
+    } finally {
+      setExporting(false);
+    }
+  }, [user?.id, includeApiKeys, t]);
+
+  // Handle file selection for import
+  const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const parsed = JSON.parse(content) as ExportedConfig;
+        
+        // Validate the config format
+        if (!parsed.version || !parsed.exportedAt) {
+          setImportExportMessage({ type: "error", text: t("settings.invalidConfigFile") });
+          return;
+        }
+        
+        // Validate config structure and field types
+        const validation = validateExportedConfig(parsed);
+        if (!validation.valid) {
+          console.error("Config validation errors:", validation.errors);
+          setImportExportMessage({ type: "error", text: t("settings.invalidConfigFile") });
+          return;
+        }
+        
+        setImportPreview(parsed);
+        setImportExportMessage(null);
+      } catch {
+        setImportExportMessage({ type: "error", text: t("settings.invalidConfigFile") });
+      }
+    };
+    reader.readAsText(file);
+    
+    // Reset the input so the same file can be selected again
+    event.target.value = "";
+  }, [t]);
+
+  // Apply imported configuration
+  const handleApplyImport = useCallback(async () => {
+    if (!importPreview || !user?.id) return;
+    
+    setImporting(true);
+    setImportExportMessage(null);
+
+    try {
+      const savePromises: Promise<Response>[] = [];
+
+      // Apply embedding config
+      if (importPreview.embedding) {
+        const newEmbeddingConfig = {
+          ...embeddingConfig,
+          ...importPreview.embedding,
+          // Don't overwrite API key if import doesn't include real keys
+          apiKey: importPreview.includesApiKeys ? importPreview.embedding.apiKey : embeddingConfig.apiKey,
+        };
+        setEmbeddingConfig(newEmbeddingConfig);
+        savePromises.push(
+          fetch("/api/settings", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              operatorId: user.id,
+              key: "embedding_config",
+              value: newEmbeddingConfig,
+            }),
+          })
+        );
+      }
+
+      // Apply chat config
+      if (importPreview.chat) {
+        const newChatConfig = {
+          ...chatConfig,
+          ...importPreview.chat,
+          apiKey: importPreview.includesApiKeys ? importPreview.chat.apiKey : chatConfig.apiKey,
+        };
+        setChatConfig(newChatConfig);
+        savePromises.push(
+          fetch("/api/settings", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              operatorId: user.id,
+              key: "chat_config",
+              value: newChatConfig,
+            }),
+          })
+        );
+      }
+
+      // Apply reranker config
+      if (importPreview.reranker) {
+        const newRerankerConfig = {
+          ...rerankerConfig,
+          ...importPreview.reranker,
+          apiKey: importPreview.includesApiKeys ? importPreview.reranker.apiKey : rerankerConfig.apiKey,
+        };
+        setRerankerConfig(newRerankerConfig);
+        savePromises.push(
+          fetch("/api/settings", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              operatorId: user.id,
+              key: "reranker_config",
+              value: newRerankerConfig,
+            }),
+          })
+        );
+      }
+
+      // Apply quality config
+      if (importPreview.quality) {
+        setQualityConfig({ ...qualityConfig, ...importPreview.quality });
+        savePromises.push(
+          fetch("/api/settings", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              operatorId: user.id,
+              key: "reranker_quality_config",
+              value: { ...qualityConfig, ...importPreview.quality },
+            }),
+          })
+        );
+      }
+
+      // Apply prompt config
+      if (importPreview.prompts) {
+        setPromptConfig({ ...promptConfig, ...importPreview.prompts });
+        savePromises.push(
+          fetch("/api/settings", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              operatorId: user.id,
+              key: "prompt_config",
+              value: { ...promptConfig, ...importPreview.prompts },
+            }),
+          })
+        );
+      }
+
+      const responses = await Promise.all(savePromises);
+      
+      // Check if any save request failed
+      const failedResponses = responses.filter(r => !r.ok);
+      if (failedResponses.length > 0) {
+        // Try to get error details from failed responses
+        const errorDetails = await Promise.all(
+          failedResponses.map(async (r) => {
+            try {
+              const json = await r.json();
+              return json.error || `HTTP ${r.status}`;
+            } catch {
+              return `HTTP ${r.status}`;
+            }
+          })
+        );
+        throw new Error(`Failed to save some settings: ${errorDetails.join(", ")}`);
+      }
+      
+      setImportExportMessage({ type: "success", text: t("settings.importSuccess") });
+      setImportPreview(null);
+    } catch (error) {
+      console.error("Import failed:", error);
+      setImportExportMessage({ type: "error", text: t("settings.importFailed") });
+    } finally {
+      setImporting(false);
+    }
+  }, [importPreview, user?.id, embeddingConfig, chatConfig, rerankerConfig, qualityConfig, promptConfig, t]);
+
+  // Cancel import
+  const handleCancelImport = useCallback(() => {
+    setImportPreview(null);
+    setImportExportMessage(null);
+  }, []);
 
   return (
     <div className="p-8">
@@ -1820,6 +2123,168 @@ export default function SettingsPage() {
             )}
           </div>
         )}
+
+        {/* Import/Export Configuration Section */}
+        {canEditSettings && (
+          <div className="border border-border p-6">
+            <h2 className="mb-2 font-mono text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              {t("settings.importExport")}
+            </h2>
+            <p className="mb-6 font-mono text-[10px] text-muted-foreground">
+              {t("settings.importExportDesc")}
+            </p>
+
+            <div className="space-y-6">
+              {/* Export Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block font-mono text-xs text-foreground">
+                      {t("settings.includeApiKeys")}
+                    </label>
+                    <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                      {t("settings.includeApiKeysDesc")}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setIncludeApiKeys(!includeApiKeys)}
+                    className={`relative h-6 w-11 rounded-full transition-colors ${
+                      includeApiKeys ? "bg-amber-500" : "bg-muted/30"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                        includeApiKeys ? "left-[22px]" : "left-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {includeApiKeys && (
+                  <div className="rounded border border-amber-500/30 bg-amber-500/5 p-3">
+                    <p className="font-mono text-[10px] text-amber-600 dark:text-amber-400">
+                      {t("settings.apiKeysWarning")}
+                    </p>
+                  </div>
+                )}
+
+                <Button
+                  onClick={handleExportConfig}
+                  disabled={exporting || loading || chatLoading || rerankerLoading || qualityLoading || promptLoading}
+                  variant="secondary"
+                  className="w-full sm:w-auto"
+                >
+                  <ExportIcon />
+                  <span className="ml-2">{exporting ? t("settings.exporting") : t("settings.exportConfig")}</span>
+                </Button>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-border" />
+
+              {/* Import Section */}
+              <div className="space-y-4">
+                {!importPreview ? (
+                  <label className="group flex cursor-pointer flex-col items-center justify-center rounded border-2 border-dashed border-muted-foreground/30 p-8 transition-colors hover:border-foreground/50">
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    <ImportIcon />
+                    <span className="mt-3 font-mono text-xs text-muted-foreground group-hover:text-foreground">
+                      {t("settings.dragDropConfig")}
+                    </span>
+                    <span className="mt-1 font-mono text-[10px] text-muted-foreground/70">
+                      {t("settings.supportedFormat")}
+                    </span>
+                  </label>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="rounded border border-blue-500/30 bg-blue-500/5 p-4">
+                      <div className="mb-3 font-mono text-xs font-medium text-blue-500">
+                        {t("settings.importPreview")}
+                      </div>
+                      <div className="space-y-2 font-mono text-[10px]">
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">{t("settings.configContains")}:</span>
+                        </div>
+                        <div className="ml-4 space-y-1">
+                          {importPreview.embedding && (
+                            <div className="flex items-center gap-2">
+                              <CheckIcon />
+                              <span>{t("settings.embeddingConfigLabel")}</span>
+                            </div>
+                          )}
+                          {importPreview.chat && (
+                            <div className="flex items-center gap-2">
+                              <CheckIcon />
+                              <span>{t("settings.chatConfigLabel")}</span>
+                            </div>
+                          )}
+                          {importPreview.reranker && (
+                            <div className="flex items-center gap-2">
+                              <CheckIcon />
+                              <span>{t("settings.rerankerConfigLabel")}</span>
+                            </div>
+                          )}
+                          {importPreview.quality && (
+                            <div className="flex items-center gap-2">
+                              <CheckIcon />
+                              <span>{t("settings.qualityConfigLabel")}</span>
+                            </div>
+                          )}
+                          {importPreview.prompts && (
+                            <div className="flex items-center gap-2">
+                              <CheckIcon />
+                              <span>{t("settings.promptConfigLabel")}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="mt-2 pt-2 border-t border-border">
+                          {importPreview.includesApiKeys ? (
+                            <span className="text-amber-500">{t("settings.includeApiKeys")}: ✓</span>
+                          ) : (
+                            <span className="text-muted-foreground">{t("settings.noApiKeysIncluded")}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded border border-amber-500/30 bg-amber-500/5 p-3">
+                      <p className="font-mono text-[10px] text-amber-600 dark:text-amber-400">
+                        {t("settings.confirmImportDesc")}
+                      </p>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={handleApplyImport}
+                        disabled={importing}
+                      >
+                        {importing ? t("settings.importing") : t("settings.confirmImport")}
+                      </Button>
+                      <Button
+                        onClick={handleCancelImport}
+                        variant="secondary"
+                        disabled={importing}
+                      >
+                        {t("common.cancel")}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {importExportMessage && (
+                <div className={`font-mono text-xs ${importExportMessage.type === "success" ? "text-green-500" : "text-red-500"}`}>
+                  {importExportMessage.text}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1873,6 +2338,52 @@ function MoonIcon() {
       strokeWidth="1.5"
     >
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  );
+}
+
+function ExportIcon() {
+  return (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    >
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="17 8 12 3 7 8" />
+      <line x1="12" y1="3" x2="12" y2="15" />
+    </svg>
+  );
+}
+
+function ImportIcon() {
+  return (
+    <svg
+      className="h-6 w-6 text-muted-foreground"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    >
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg
+      className="h-3 w-3 text-green-500"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <polyline points="20 6 9 17 4 12" />
     </svg>
   );
 }

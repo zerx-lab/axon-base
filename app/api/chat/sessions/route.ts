@@ -68,11 +68,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
+    // Generate default title if not provided
+    // Use ISO format for consistency across all locales
+    const now = new Date();
+    const dateStr = `${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    const sessionTitle = title || `Chat ${dateStr}`;
+
     const { data: newSession, error } = await supabase
       .from("chat_sessions")
       .insert({
         user_id: operatorId,
-        title: title || null,
+        title: sessionTitle,
         kb_ids: kbIds || [],
         settings: (settings || {}) as Json,
       })
